@@ -1,0 +1,4 @@
+hello lower case string
+Hello mixed case 
+Hello MIXED CASE
+
