@@ -1,0 +1,149 @@
+#!/bin/zsh
+
+# this utility searches text files under the current directory
+# that each contain occurrences of multiple strings
+
+show=0
+if [[ "$1" == "-S" || "$1" == "--show-matches" ]]
+then
+  show=1
+  shift
+fi
+
+if [ $# -eq 0 ]
+then
+  echo >&2 "$0: at least one pattern required"
+  exit 1
+fi
+
+if [[ "${@[$#]}" == -* ]]
+then
+  echo >&2 "$0: last argument must be a pattern, not a flag"
+  exit 1
+fi
+
+function extract_flags()
+{
+  local start=$1
+  shift
+  local v=("$@")
+  local next=$start
+  local sp
+
+  while [[ $next < ${#v[@]} ]]
+  do
+    if [[ "${v[@]:$next:1}" != -* ]]
+    then
+      break
+    fi
+    printf "%s%s" "$sp" "${v[@]:$next:1}"
+    next=$((next + 1))
+    sp=" "
+  done
+
+  return $next
+}
+
+function gen_egrep()
+{
+  local pat="$1"
+  local first="$2"
+  local last=$3
+  local show="$4"
+  shift 4
+  local opts="$@"
+  local zero_opt=""
+
+  first_opt=""
+  if (( $first == 1 ))
+  then
+    first_opt="--binary-files=without-match"
+  fi
+
+  if (( $show == 1 ))
+  then
+    file_opt=-H
+  else
+    file_opt=--files-with-matches
+    if (( $last == 0 ))
+    then
+      zero_opt=--null
+    fi
+  fi
+
+  echo \
+    xargs -0 egrep \
+      $first_opt \
+      $zero_opt \
+      $file_opt \
+      $opts \
+      "'$pat'"
+  return 0
+}
+
+# Take action based on whether we are in a directory under "git"
+if git -C . rev-parse 2>/dev/null
+then
+  command="git ls-files -z ."
+else
+  # Do not include hidden directories
+  command="find . \( -type d -name '.*' ! -name . -prune \) -o -type f -print0"
+fi
+
+# Now construct command line by iterating per pattern
+arg_idx=0
+args=($@)
+pat="${args[@]:$arg_idx:1}"
+arg_count=${#args[@]}
+
+while (( $arg_idx < $arg_count ))
+do
+    egrep_options=$(extract_flags $arg_idx ${args[@]})
+    arg_idx=$?
+
+    pat="${args[@]:$arg_idx:1}"
+
+    show_arg=0
+    is_last=$((arg_idx == arg_count - 1))
+    is_first=$((arg_idx == 0))
+    if (( $show == 1 ))
+    then
+      if (($arg_count == 1))
+      then
+        show_arg=1
+      else
+        is_last=0
+      fi
+    fi
+
+    command="${command} | "$(gen_egrep "$pat" $is_first $is_last $show_arg $egrep_options)
+    arg_idx=$((arg_idx + 1))
+done
+
+#echo >&2 $command
+if (( $show == 0 || $arg_count == 1))
+then
+  eval "$command"
+  #echo >&2 "$command"
+else
+  match_data_file=/tmp/mgrep-$$.tmp
+  trap 'rm -f $match_data_file; exit 1' 1 2 5 15
+  eval "$command > $match_data_file"
+  #echo >&2 "$command > $match_data_file"
+
+  arg_idx=0
+  while (( $arg_idx < $arg_count ))
+  do
+    egrep_options=$(extract_flags $arg_idx ${args[@]})
+    arg_idx=$?
+
+    pat="${args[@]:$arg_idx:1}"
+
+    #echo >&2 "$(gen_egrep "$pat" $is_first 1 1 $egrep_options) < $match_data_file"
+    eval "$(gen_egrep "$pat" 0 1 1 $egrep_options) < $match_data_file"
+
+    arg_idx=$((arg_idx + 1))
+  done
+  rm -f $match_data_file
+fi
+exit $?
