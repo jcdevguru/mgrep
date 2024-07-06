@@ -123,14 +123,15 @@ done
 #echo >&2 $command
 if (( $show == 0 || $arg_count == 1))
 then
+  #echo "command = '$command'" >&2 
   eval "$command"
-  #echo >&2 "$command"
 else
   match_data_file=/tmp/mgrep-$$.tmp
   trap 'rm -f $match_data_file; exit 1' 1 2 5 15
-  eval "$command > $match_data_file"
-  #echo >&2 "$command > $match_data_file"
 
+  cmd="$command > $match_data_file"
+  #echo "cmd1 = '$cmd'" >&2 
+  eval "$cmd"
   arg_idx=0
   while (( $arg_idx < $arg_count ))
   do
@@ -139,9 +140,10 @@ else
 
     pat="${args[@]:$arg_idx:1}"
 
-    #echo >&2 "$(gen_egrep "$pat" $is_first 1 1 $egrep_options) < $match_data_file"
-    eval "$(gen_egrep "$pat" 0 1 1 $egrep_options) < $match_data_file"
 
+    cmd="$(gen_egrep "$pat" 0 1 1 $egrep_options) < $match_data_file"
+    #echo "cmd2 = '$cmd'" >&2 
+    eval "$cmd"
     arg_idx=$((arg_idx + 1))
   done
   rm -f $match_data_file
