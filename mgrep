@@ -4,7 +4,7 @@
 # that each contain occurrences of multiple strings
 
 show=0
-if [[ "$1" == "-S" || "$1" == "--show-matches" ]]
+if [[ "$1" == "+S" ]]
 then
   show=1
   shift

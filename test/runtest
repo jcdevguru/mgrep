@@ -38,18 +38,18 @@ function run_test()
 cd test_base || { echo >&2 "missing directory 'test_base' - exiting"; exit 1; }
 
 run_test "Usage - no arguments (error)" 1 "" 
-run_test "Usage - end with flag (error)" 1 -S 
+run_test "Usage - end with flag (error)" 1 +S 
 
 run_test "Basic - 1 string, no matches (1 exit status)" 1 "" NOTHING
 run_test "Basic - 1 string, 1 file" 0 "01.txt" hello
 run_test "Basic - 1 string, >1 file" 0 "01.txt\n02.txt" case
 run_test "Basic - 1 string, 1 file (case-sensitive default)" 0 "02.txt" Case
 run_test "Basic - 1 string, >1 file (case-insensitive match with flag)" 0 "01.txt\n02.txt" -i Case
-run_test "Basic - 1 string, 1 file, show matches" 0 "01.txt:Hello MIXED CASE" -S MIXED
+run_test "Basic - 1 string, 1 file, show matches" 0 "01.txt:Hello MIXED CASE" +S MIXED
 
 run_test "Simple - 2 strings in 1 file, separate lines" 0 "01.txt" lower case
 run_test "Simple - filename with spaces" 0 "a b c.txt" spacey
-run_test "Simple - filename with spaces, show matches" 0 "a b c.txt:spacey file" -S spacey
-run_test "Simple - 1 string > 1 file, show matches (case insensitive)" 0 "01.txt:Hello MIXED CASE\n01.txt:Hello mixed case \n01.txt:hello lower case string\n02.txt:Case matters\n02.txt:case can matter\n02.txt:cases like this are difficult" -S -i case
+run_test "Simple - filename with spaces, show matches" 0 "a b c.txt:spacey file" +S spacey
+run_test "Simple - 1 string > 1 file, show matches (case insensitive)" 0 "01.txt:Hello MIXED CASE\n01.txt:Hello mixed case \n01.txt:hello lower case string\n02.txt:Case matters\n02.txt:case can matter\n02.txt:cases like this are difficult" +S -i case
 
 echo "Tests complete. Error count = $FAIL_CNT"
