@@ -77,7 +77,7 @@ function gen_egrep()
       $zero_opt \
       $file_opt \
       $opts \
-      "'$pat'"
+      "'${pat:gs/"'"/'\"'\"'}'"
   return 0
 }
 
