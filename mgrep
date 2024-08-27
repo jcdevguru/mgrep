@@ -1,14 +1,97 @@
-#!/bin/zsh
+#!zsh
 
-# this utility searches text files under the current directory
+# this utility finds text files under the current directory
 # that each contain occurrences of multiple strings
 
+# Flags with '+' are processed by this script
+# Toggle flags:
+# lowercase = true, uppercase = false
+
+# +d, +D: turn on and off debug messages (default: off)
+# +s, +S: show or do not show matching strings (default: off)
+# +g, +G: use github ls-files for starting paths if available (default: on)
+# +n, +N: dry run or do not dry run (default: off)
+# +i=cmd: initialize options with cmd (default: none)
+# +xd=pat1 +xd=pat2: ignore directories whose names match pat1 or pat2 (default: none)
+# +od=pat1 +od=pat2: search only in hierarchy under directory with name that matches pat1 or pat2 (default: none)
+# +xf=pat1 +xf=pat2: ignore plain files whose names match pat1 or pat2 (default: none)
+# +of=pat1 +xf=pat2: search plain files only with names that match pat1 or pat2 (default: none)
+
+# Flags with '-' are passed to egrep
+
+# Defaults
 show=0
-if [[ "$1" == "+S" ]]
+github=1
+debug=0
+dry_run=0
+
+declare -a xf xd of od
+declare init
+
+# Process option file, if exists
+option_files=($HOME/.mgrep .mgrep)
+for option_file in "${option_files[@]}"
+do
+  if [[ -f "$option_file" ]]
+  then
+    . "$option_file"
+  fi
+done
+
+# Process init & debug flags first
+for a in "$@"
+do
+  case "$a" in
+    +i=*) init="${a#+i=}" ;;
+    +d)   debug=1 ;;
+    +D)   debug=$dry_run ;;
+    +n)   dry_run=1; debug=1 ;;
+    +N)   dry_run=0 ;;
+    +*)   continue ;;
+    *)    break;
+  esac
+done
+
+if [[ $debug == 1 ]]
 then
-  show=1
-  shift
+  function dlog()
+  {
+    type="$1"
+    shift
+    echo >&2 "DEBUG [$type]: $*"
+    return 0
+  }
+else
+  function dlog() 
+  {
+    return 0
+  }
 fi
+
+if [[ "$init" != "" ]]
+then
+  dlog options initializing with command "$init"
+  eval "$init"
+fi
+
+# Now process flags
+while [[ "$1" == +* ]]
+do
+  case "$1" in
+    +s)    show=1 ;;
+    +S)    show=0 ;;
+    +xf=*) xf+="${1#+xf=}" ;;
+    +xd=*) xd+="${1#+xd=}" ;;
+    +of=*) of+="${1#+of=}" ;;
+    +od=*) od+="${1#+od=}" ;;
+    +g)    github=1 ;;
+    +G)    github=0 ;;
+    +[dDnN]|+i=*) ;;
+    *) echo >&2 "$0: unknown flag '$1'"; exit 1;;
+  esac
+
+  shift
+done
 
 if [ $# -eq 0 ]
 then
@@ -21,6 +104,56 @@ then
   echo >&2 "$0: last argument must be a pattern, not a flag"
   exit 1
 fi
+
+dlog options \
+  debug="$debug"\
+  dry_run="$dry_run"\
+  github="$github"\
+  show="$show"\
+  xf="(${xf[@]})"\
+  of="(${of[@]})"\
+  xd="(${xd[@]})"\
+  od="(${od[@]})"\
+  init="'$init'"
+
+if [[ "${of}" != "" && "${xf}" != "" ]]
+then
+  dlog process not using file exclusion due to specific file targets
+  unset xf
+fi
+
+function find_args()
+{
+  flag="$1"
+  prefix="$2"
+  suffix="$3"
+  shift 3
+
+  local args=""
+  for a in "$@"
+  do
+    if [[ "$a" == '' ]]
+    then
+      continue 
+    fi
+
+    if [[ "$args" != "" ]]
+    then
+      args+=" -o "
+    fi
+
+    args+="-"$flag" '$prefix$a$suffix'"
+  done
+  echo "$args"
+}
+
+function find_name_args() {
+  find_args name "" "" "$@"
+}
+
+function find_path_args() {
+  find_args path '*/' '/*' "$@"
+}
 
 function extract_flags()
 {
@@ -62,6 +195,7 @@ function gen_egrep()
 
   if (( $show == 1 ))
   then
+    # always include file names when showing
     file_opt=-H
   else
     file_opt=--files-with-matches
@@ -81,13 +215,122 @@ function gen_egrep()
   return 0
 }
 
-# Take action based on whether we are in a directory under "git"
-if git -C . rev-parse 2>/dev/null
+# Take action based on whether we are in a directory managed by git
+if [[ $github == 1 ]]
+then
+  if command -v git >/dev/null 2>&1
+  then
+    if git -C . rev-parse 2>/dev/null
+    then
+      dlog process "using git to list files (directory in git)"
+    else
+      dlog process "not using git to list files (directory not in git)"
+      github=0
+    fi
+  else
+    dlog process "not using git to list files (git not in command environment)"
+    github=0
+  fi
+fi
+
+# xd: +xd=node_modules +xd=logs 
+#     find . \( -type d \( -name node_modules -o -name logs \) ! -name . -prune \) -o -type f -print
+#
+# od: +od=src
+#     find . \( -path '*/src/*' -type f -print
+
+if [[ $github == 1 ]]
 then
   command="git ls-files -z ."
+  
+  # Function to apply file and directory patterns
+  filter_paths() {
+    local mode="$1"
+    shift
+    local patterns=("$@")
+    
+    while IFS= read -r -d '' path; do
+      local match=0
+      case "$mode" in
+        of|xf)
+          for pattern in "${patterns[@]}"; do
+            if [[ "$path" == ${~pattern} || "$path" == */${~pattern} ]]; then
+              match=1
+              break
+            fi
+          done
+          ;;
+        od|xd)
+          for pattern in "${patterns[@]}"; do
+            if [[ "$path" == ${~pattern}/* || "$path" == */${~pattern}/* ]]; then
+              match=1
+              break
+            fi
+          done
+          ;;
+      esac
+      
+      # flip match value based on whether or not we are excluding
+      [[ "$mode" == x[df] ]] && match=$((1-match))
+      [[ $match -eq 1 ]] && printf "%s\0" "$path"
+    done
+  }
+  
+  # Helper function to safely quote patterns
+  quote_patterns() {
+    local arr=("$@")
+    printf "'%s' " "${arr[@]}"
+  }
+  
+  # Apply directory exclusions
+  if [[ "${xd[@]}" != "" ]]; then
+    command+=" | filter_paths xd $(quote_patterns "${xd[@]}")"
+  fi
+  
+  # Apply directory exclusives
+  if [[ "${od[@]}" != "" ]]; then
+    command+=" | filter_paths od $(quote_patterns "${od[@]}")"
+  fi
+  
+  # Apply file filtering
+  if [[ "${of[@]}" != "" ]]; then
+    command+=" | filter_paths of $(quote_patterns "${of[@]}")"
+  fi
+  if [[ "${xf[@]}" != "" ]]; then
+    command+=" | filter_paths xf $(quote_patterns "${xf[@]}")"
+  fi
+  
 else
-  # Do not include hidden directories
-  command="find . \( -type d -name '.*' ! -name . -prune \) -o -type f -print0"
+  command="find ."
+
+  exclude_dirs=$(find_name_args "${xd[@]}")
+  only_paths=$(find_path_args "${od[@]}")
+
+  if [[ "$exclude_dirs" != "" ]]
+  then
+    command+=" \( -type d \( $exclude_dirs \) ! -name . -prune \) -o"
+  fi
+
+  if [[ "$only_paths" != "" ]]
+  then
+    command+=" \( $only_paths \)"
+  fi
+
+  command+=" -type f" 
+
+  exclude_files=$(find_name_args "${xf[@]}")
+  if [[ "$exclude_files" != "" ]]
+  then
+    command+=" ! \( $exclude_files \)"
+  else
+    only_files=$(find_name_args "${of[@]}")
+    if [[ "$only_files" != "" ]]
+    then
+      command+=" \( $only_files \)"
+    fi
+  fi
+
+  command+=" -print0"
 fi
 
 # Now construct command line by iterating per pattern
@@ -120,18 +363,23 @@ do
     arg_idx=$((arg_idx + 1))
 done
 
-#echo >&2 $command
-if (( $show == 0 || $arg_count == 1))
+if (( $show == 0 || $arg_count == 1 ))
 then
-  #echo "command = '$command'" >&2 
-  eval "$command"
+  dlog execute command = "[$command]"
+  if (( $dry_run == 0 ))
+  then
+    eval "$command"
+  fi
 else
   match_data_file=/tmp/mgrep-$$.tmp
   trap 'rm -f $match_data_file; exit 1' 1 2 5 15
 
   cmd="$command > $match_data_file"
-  #echo "cmd1 = '$cmd'" >&2 
-  eval "$cmd"
+  dlog execute command = "[$cmd]"
+  if (( $dry_run == 0 ))
+  then
+    eval "$cmd"
+  fi
   arg_idx=0
   while (( $arg_idx < $arg_count ))
   do
@@ -142,8 +390,11 @@ else
 
 
     cmd="$(gen_egrep "$pat" 0 1 1 $egrep_options) < $match_data_file"
-    #echo "cmd2 = '$cmd'" >&2 
-    eval "$cmd"
+    dlog execute command = "[$cmd]"
+    if (( $dry_run == 0 ))
+    then
+      eval "$cmd"
+    fi
     arg_idx=$((arg_idx + 1))
   done
   rm -f $match_data_file
