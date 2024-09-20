@@ -260,7 +260,7 @@ and all directories will be searched, even the `.git` directory (which you can e
 If you don't want certain directories traversed, you can name them in command arguments to `mgrep`.  For example, if you do not want to traverse directories named `log`, `tmp`, or `.git` anywhere in the hierarchy, you can use this command:
 
 ```sh
-mgrep +xd=log +xd=tmp +xd=.git abc def
+mgrep +G +xd=log +xd=tmp +xd=.git abc def
 ```
 
 to make `mgrep` use this command to search:
@@ -298,7 +298,7 @@ which ignores all directories named with a leading `.` (not including `.`, of co
 You can also use `mgrep` with `+od` to look only under certain directories by name, excluding all others.  You can use wildcards here as well.
 
 ```sh
-mgrep +od='node_modules' +od='.npm*' eslint airbnb
+mgrep +G +od='node_modules' +od='.npm*' eslint airbnb
 ```
 
 The above would cause the initial file list to include plain files under in hierarchies under directories named `node_modules` or with names that start with name `.npm`:
@@ -316,7 +316,7 @@ The command:
 
 
 ```sh
-mgrep +xd=tmp +of=package.json +of=package-lock.json +of=.pnpm-lock.yaml module1 module2
+mgrep +G +xd=tmp +of=package.json +of=package-lock.json +of=.pnpm-lock.yaml module1 module2
 ```
 
 will list all plain files named `package.json`, `package-lock.json`, or `.pnpm-lock.yaml` not in a hierachy under any directory named `tmp` and that contain both strings `module1` and `module2`.  The generated command would look this way:
