@@ -4,24 +4,39 @@
 # that each contain occurrences of multiple strings
 
 # Flags with '+' are processed by this script
-# Toggle flags:
-# lowercase = true, uppercase = false
+# Flags with '-' are passed to egrep (or whatever matcher is provided)
+
+# Toggle options (lowercase = ON, uppercase = OFF):
 
 # +d, +D: turn on and off debug messages (default: off)
 # +s, +S: show or do not show matching strings (default: off)
 # +g, +G: use github ls-files for starting paths if available (default: on)
 # +n, +N: dry run or do not dry run (default: off)
 # +i=cmd: initialize options with cmd (default: none)
-# +xd=pat1 +xd=pat2: ignore directories whose names match pat1 or pat2 (default: none)
-# +od=pat1 +od=pat2: search only in hierarchy under directory with name that matches pat1 or pat2 (default: none)
-# +xf=pat1 +xf=pat2: ignore plain files whose names match pat1 or pat2 (default: none)
-# +of=pat1 +xf=pat2: search plain files only with names that match pat1 or pat2 (default: none)
 
-# Flags with '-' are passed to egrep
+# Filter options (may be specified multiple times, in any combination):
+#
+# Supports multiple values in comma-separated list:
+#   +xd=pat1[,pat2,...]: ignore directories whose names match pat1 or pat2 (default: none)
+#   +od=pat1[,pat2,...]: search only in hierarchy under directory with name that matches pat1 or pat2 (default: none)
+#   +xf=pat1[,pat2,...]: ignore plain files whose names match pat1 or pat2 (default: none)
+#   +of=pat1[,pat2,...]: search plain files only with names that match pat1 or pat2 (default: none)
+
+# Variants ixd, iod, ixf, and iof process values literally, without processing comma-separate values.
+
 
 # Defaults
+
+# Use egrep to match strings in files
+matcher=egrep
+
+# Do not show matched results, just files
 show=0
+
+# Support only Github-recognized files (if applicable)
 github=1
+
+# Do not debug or dry-run
 debug=0
 dry_run=0
 
@@ -58,7 +73,7 @@ then
   {
     type="$1"
     shift
-    echo >&2 "DEBUG [$type]: $*"
+    echo -E "DEBUG [$type]: $*" >&2 
     return 0
   }
 else
@@ -80,12 +95,17 @@ do
   case "$1" in
     +s)    show=1 ;;
     +S)    show=0 ;;
-    +xf=*) xf+="${1#+xf=}" ;;
-    +xd=*) xd+="${1#+xd=}" ;;
-    +of=*) of+="${1#+of=}" ;;
-    +od=*) od+="${1#+od=}" ;;
     +g)    github=1 ;;
     +G)    github=0 ;;
+    +m=*)  matcher="${1#+m=}" ;;
+    +xf=*) v="${1#+xf=}"; a=(${(ps.,.)v}); xf+=(${a[@]}) ;;
+    +xd=*) v="${1#+xd=}"; a=(${(ps.,.)v}); xd+=(${a[@]}) ;;
+    +of=*) v="${1#+of=}"; a=(${(ps.,.)v}); of+=(${a[@]}) ;;
+    +od=*) v="${1#+od=}"; a=(${(ps.,.)v}); od+=(${a[@]}) ;;
+    +ixf=*) xf+="${1#+ixf=}" ;;
+    +ixd=*) xd+="${1#+ixd=}" ;;
+    +iof=*) of+="${1#+iof=}" ;;
+    +iod=*) od+="${1#+iod=}" ;;
     +[dDnN]|+i=*) ;;
     *) echo >&2 "$0: unknown flag '$1'"; exit 1;;
   esac
@@ -115,12 +135,6 @@ dlog options \
   xd="(${xd[@]})"\
   od="(${od[@]})"\
   init="'$init'"
-
-if [[ "${of}" != "" && "${xf}" != "" ]]
-then
-  dlog process not using file exclusion due to specific file targets
-  unset xf
-fi
 
 function find_args()
 {
@@ -155,6 +169,23 @@ function find_path_args() {
   find_args path '*/' '/*' "$@"
 }
 
+function quote_pattern() {
+  local pat="$1"
+  echo -E "'${pat:gs/"'"/'\"'\"'}'"
+}
+
+function quote_patterns() {
+  local arr=("$@")
+  local rc=()
+
+  for p in "${arr[@]}"; do
+    rc+=("$(quote_pattern "$p")")
+  done
+
+  printf "%s " "${rc[@]}"
+  echo ""
+}
+
 function extract_flags()
 {
   local start=$1
@@ -177,7 +208,46 @@ function extract_flags()
   return $next
 }
 
-function gen_egrep()
+filter_paths() {
+  local mode="$1"
+  shift
+  local patterns=("$@")
+  
+  while IFS= read -r -d '' filepath
+  do
+    local match=0
+    case "$mode" in
+      of|xf)
+        filename=${filepath:t}
+        for pattern in "${patterns[@]}"
+        do
+          if [[ "$filename" == ${~pattern} ]]
+          then
+            match=1
+            break
+          fi
+        done
+        ;;
+      od|xd)
+        for pattern in "${patterns[@]}"
+        do
+          if [[ "$filepath" == */${~pattern}/* || "$filepath" == ${~pattern}/* ]]
+          then
+            match=1
+            break
+          fi
+        done
+        ;;
+    esac
+    
+    # flip match value based on whether or not we are excluding
+    [[ "$mode" == x[df] ]] && match=$((1-match))
+    [[ $match -eq 1 ]] && printf "%s\0" "$filepath"
+  done
+}
+  
+
+function gen_match()
 {
   local pat="$1"
   local first="$2"
@@ -205,13 +275,13 @@ function gen_egrep()
     fi
   fi
 
-  echo \
-    xargs -0 egrep \
+  echo -E \
+    xargs -0 "$matcher" \
       $first_opt \
       $zero_opt \
       $file_opt \
       $opts \
-      "'${pat:gs/"'"/'\"'\"'}'"
+      "$(quote_pattern "$pat")"
   return 0
 }
 
@@ -243,45 +313,6 @@ if [[ $github == 1 ]]
 then
   command="git ls-files -z ."
   
-  # Function to apply file and directory patterns
-  filter_paths() {
-    local mode="$1"
-    shift
-    local patterns=("$@")
-    
-    while IFS= read -r -d '' path; do
-      local match=0
-      case "$mode" in
-        of|xf)
-          for pattern in "${patterns[@]}"; do
-            if [[ "$path" == ${~pattern} || "$path" == */${~pattern} ]]; then
-              match=1
-              break
-            fi
-          done
-          ;;
-        od|xd)
-          for pattern in "${patterns[@]}"; do
-            if [[ "$path" == ${~pattern}/* || "$path" == */${~pattern}/* ]]; then
-              match=1
-              break
-            fi
-          done
-          ;;
-      esac
-      
-      # flip match value based on whether or not we are excluding
-      [[ "$mode" == x[df] ]] && match=$((1-match))
-      [[ $match -eq 1 ]] && printf "%s\0" "$path"
-    done
-  }
-  
-  # Helper function to safely quote patterns
-  quote_patterns() {
-    local arr=("$@")
-    printf "'%s' " "${arr[@]}"
-  }
-  
   # Apply directory exclusions
   if [[ "${xd[@]}" != "" ]]; then
     command+=" | filter_paths xd $(quote_patterns "${xd[@]}")"
@@ -296,6 +327,7 @@ then
   if [[ "${of[@]}" != "" ]]; then
     command+=" | filter_paths of $(quote_patterns "${of[@]}")"
   fi
+
   if [[ "${xf[@]}" != "" ]]; then
     command+=" | filter_paths xf $(quote_patterns "${xf[@]}")"
   fi
@@ -304,30 +336,31 @@ else
   command="find ."
 
   exclude_dirs=$(find_name_args "${xd[@]}")
-  only_paths=$(find_path_args "${od[@]}")
 
   if [[ "$exclude_dirs" != "" ]]
   then
     command+=" \( -type d \( $exclude_dirs \) ! -name . -prune \) -o"
   fi
 
+  command+=" -type f" 
+
+  exclude_files=$(find_name_args "${xf[@]}")
+  only_files=$(find_name_args "${of[@]}")
+  only_paths=$(find_path_args "${od[@]}")
+
   if [[ "$only_paths" != "" ]]
   then
     command+=" \( $only_paths \)"
   fi
+  
+  if [[ "$only_files" != "" ]]
+  then
+    command+=" \( $only_files \)"
+  fi
 
-  command+=" -type f" 
-
-  exclude_files=$(find_name_args "${xf[@]}")
   if [[ "$exclude_files" != "" ]]
   then
     command+=" ! \( $exclude_files \)"
-  else
-    only_files=$(find_name_args "${of[@]}")
-    if [[ "$only_files" != "" ]]
-    then
-      command+=" \( $only_files \)"
-    fi
   fi
 
   command+=" -print0"
@@ -341,7 +374,7 @@ arg_count=${#args[@]}
 
 while (( $arg_idx < $arg_count ))
 do
-    egrep_options=$(extract_flags $arg_idx ${args[@]})
+    match_options=$(extract_flags $arg_idx ${args[@]})
     arg_idx=$?
 
     pat="${args[@]:$arg_idx:1}"
@@ -359,7 +392,7 @@ do
       fi
     fi
 
-    command="${command} | "$(gen_egrep "$pat" $is_first $is_last $show_arg $egrep_options)
+    command="${command} | "$(gen_match "$pat" $is_first $is_last $show_arg $match_options)
     arg_idx=$((arg_idx + 1))
 done
 
@@ -383,13 +416,13 @@ else
   arg_idx=0
   while (( $arg_idx < $arg_count ))
   do
-    egrep_options=$(extract_flags $arg_idx ${args[@]})
+    match_options=$(extract_flags $arg_idx ${args[@]})
     arg_idx=$?
 
     pat="${args[@]:$arg_idx:1}"
 
 
-    cmd="$(gen_egrep "$pat" 0 1 1 $egrep_options) < $match_data_file"
+    cmd="$(gen_match "$pat" 0 1 1 $match_options) < $match_data_file"
     dlog execute command = "[$cmd]"
     if (( $dry_run == 0 ))
     then
