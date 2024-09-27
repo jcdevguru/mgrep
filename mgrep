@@ -4,24 +4,35 @@
 # that each contain occurrences of multiple strings
 
 # Flags with '+' are processed by this script
-# Toggle flags:
-# lowercase = true, uppercase = false
+# Flags with '-' are passed to egrep
+
+# Toggle options (lowercase = ON, uppercase = OFF):
 
 # +d, +D: turn on and off debug messages (default: off)
 # +s, +S: show or do not show matching strings (default: off)
 # +g, +G: use github ls-files for starting paths if available (default: on)
 # +n, +N: dry run or do not dry run (default: off)
 # +i=cmd: initialize options with cmd (default: none)
-# +xd=pat1 +xd=pat2: ignore directories whose names match pat1 or pat2 (default: none)
-# +od=pat1 +od=pat2: search only in hierarchy under directory with name that matches pat1 or pat2 (default: none)
-# +xf=pat1 +xf=pat2: ignore plain files whose names match pat1 or pat2 (default: none)
-# +of=pat1 +xf=pat2: search plain files only with names that match pat1 or pat2 (default: none)
 
-# Flags with '-' are passed to egrep
+# Filter options (may be specified multiple times, in any combination):
+#
+# Supports multiple values in comma-separated list:
+#   +xd=pat1[,pat2,...]: ignore directories whose names match pat1 or pat2 (default: none)
+#   +od=pat1[,pat2,...]: search only in hierarchy under directory with name that matches pat1 or pat2 (default: none)
+#   +xf=pat1[,pat2,...]: ignore plain files whose names match pat1 or pat2 (default: none)
+#   +of=pat1[,pat2,...]: search plain files only with names that match pat1 or pat2 (default: none)
+
+# Variants ixd, iod, ixf, and iof process values literally, without processing comma-separate values.
+
 
 # Defaults
+# Do not show matched results, just files
 show=0
+
+# Support only Github-recognized files (if applicable)
 github=1
+
+# Do not debug or dry-run
 debug=0
 dry_run=0
 
@@ -80,10 +91,14 @@ do
   case "$1" in
     +s)    show=1 ;;
     +S)    show=0 ;;
-    +xf=*) xf+="${1#+xf=}" ;;
-    +xd=*) xd+="${1#+xd=}" ;;
-    +of=*) of+="${1#+of=}" ;;
-    +od=*) od+="${1#+od=}" ;;
+    +xf=*) v="${1#+xf=}"; a=(${(ps.,.)v}); xf+=(${a[@]}) ;;
+    +xd=*) v="${1#+xd=}"; a=(${(ps.,.)v}); xd+=(${a[@]}) ;;
+    +of=*) v="${1#+of=}"; a=(${(ps.,.)v}); of+=(${a[@]}) ;;
+    +od=*) v="${1#+od=}"; a=(${(ps.,.)v}); od+=(${a[@]}) ;;
+    +ixf=*) xf+="${1#+ixf=}" ;;
+    +ixd=*) xd+="${1#+ixd=}" ;;
+    +iof=*) of+="${1#+iof=}" ;;
+    +iod=*) od+="${1#+iod=}" ;;
     +g)    github=1 ;;
     +G)    github=0 ;;
     +[dDnN]|+i=*) ;;

@@ -121,8 +121,6 @@ test/test all.js
 
 `mgrep` accepts flags that start with `+`, not `-`, since flags that begin with `-` are passed to `egrep` (see below).  You can have multiple occurrences of flags to use for filtering.
 
-Here they are:
-
 | Option | Description | Default |
 |--------|-------------|---------|
 | +d, +D | Turn on and off debug messages | Off |
@@ -130,10 +128,20 @@ Here they are:
 | +g, +G | Use github ls-files for starting paths if available | On |
 | +i=cmd | Initialize options with command | None |
 | +n, +N | Dry run: apply debugging but do not execute search | Off |
-| +xd=pat1 +xd=pat2 | Ignore directories whose names match pat1 or pat2 | None |
-| +od=pat1 +od=pat2 | Search only in hierarchy under directory with name that matches pat1 or pat2 | None |
-| +xf=pat1 +xf=pat2 | Ignore plain files whose names match pat1 or pat2 | None |
-| +of=pat1 +of=pat2 | Search plain files only with names that match pat1 or pat2 | None |
+| +xd=pat1[,pat2,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
+| +od=pat1[,pat2,...] | Search only under directories whose names match any pattern in comma-separated list| None |
+| +xf=pat1[,pat2,...] | Ignore plain files whose names match any pattern in comma-separated list| None |
+| +of=pat1[,pat2,...] | Search only in hierarchy under directory with name that matches any pattern in comma-separated list | None |
+| +ixd=pat +iod=pat +ixf=pat +iof=pat | Same as +xd, +od, +xf, +of, except without comma-separation | None |
+
+The options that select or ignore files and directories (`xd`, `od`, `xf`, `of`, and variants that start with the letter `i`) have the following features:
+
+* Any of these options can be used multiple times on the command line, in any combination or order.
+* Arguments that do not begin with `i` can be used with comma-separated lists
+* Shell-style wildcards that are usable by `find` in its `name` or `path` arguments may also be used
+* Strings with any characters can be used as arguments, including whitespace
+* You can use the variants `ixd`, `iod`, `ixf`, or `iof` if the arguments contain commas
+* Will combine with filtering provided by Github when `+g` is used
 
 ## Configuring mgrep options with .mgrep
 
@@ -223,10 +231,10 @@ test/test all.js:// iterate over this array
 
 ### Raw search, without Git or just ignoring it
 
-By default, `mgrep` will traverse the files listed in a Git sourcebase.  However, if you do not have `git` in your command path or are not in a directory structure that is manged by Git, `mgrep` will use `find` rather than `git ls-files` to get its initial file list to search. For example, this command:
+By default, `mgrep` will traverse the files listed in a Git sourcebase.  However, if you do not have `git` in your command path or are not in a directory structure that is manged by Git, `mgrep` will use `find` rather than `git ls-files` to get its initial file list to search. If you **are** in a Git directory hierarchy, and want to traverse all files anyway, you can supply the `+G` flag:
 
 ```sh
-mgrep abc def
+mgrep +G abc def
 ```
 
 would generate this command to search:
@@ -247,20 +255,13 @@ xargs -0 \
 
 which means all text files under the current directory would be searched if the directory hierarchy is not managed by Git.
 
-If you **are** in a Git directory hierarchy, and want to bypass `.gitIgnore` anyway and traverse all files, you can supply the `+G` flag:
-
-```sh
-mgrep +G abc def
-```
-
-and all directories will be searched, even the `.git` directory (which you can exclude, see below).
 
 ### Raw search, exclude certain directories
 
 If you don't want certain directories traversed, you can name them in command arguments to `mgrep`.  For example, if you do not want to traverse directories named `log`, `tmp`, or `.git` anywhere in the hierarchy, you can use this command:
 
 ```sh
-mgrep +G +xd=log +xd=tmp +xd=.git abc def
+mgrep +G +xd=log,tmp,.git abc def
 ```
 
 to make `mgrep` use this command to search:
@@ -298,7 +299,7 @@ which ignores all directories named with a leading `.` (not including `.`, of co
 You can also use `mgrep` with `+od` to look only under certain directories by name, excluding all others.  You can use wildcards here as well.
 
 ```sh
-mgrep +G +od='node_modules' +od='.npm*' eslint airbnb
+mgrep +G +od='node_modules,.npm*' eslint airbnb
 ```
 
 The above would cause the initial file list to include plain files under in hierarchies under directories named `node_modules` or with names that start with name `.npm`:
@@ -316,7 +317,7 @@ The command:
 
 
 ```sh
-mgrep +G +xd=tmp +of=package.json +of=package-lock.json +of=.pnpm-lock.yaml module1 module2
+mgrep +G +xd=tmp +of=package.json,package-lock.json,.pnpm-lock.yaml module1 module2
 ```
 
 will list all plain files named `package.json`, `package-lock.json`, or `.pnpm-lock.yaml` not in a hierachy under any directory named `tmp` and that contain both strings `module1` and `module2`.  The generated command would look this way:
