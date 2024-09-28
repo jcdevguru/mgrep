@@ -170,6 +170,22 @@ function find_path_args() {
   find_args path '*/' '/*' "$@"
 }
 
+function quote_pattern() {
+  local pat="$1"
+  echo "'${pat:gs/"'"/'\"'\"'}'"
+}
+
+function quote_patterns() {
+  local arr=("$@")
+  local rc=()
+
+  for p in "${arr[@]}"; do
+    rc+=("$(quote_pattern "$p")")
+  done
+
+  printf "%s " "${rc[@]}"
+}
+
 function extract_flags()
 {
   local start=$1
@@ -226,7 +242,7 @@ function gen_egrep()
       $zero_opt \
       $file_opt \
       $opts \
-      "'${pat:gs/"'"/'\"'\"'}'"
+      $(quote_pattern "$pat")
   return 0
 }
 
