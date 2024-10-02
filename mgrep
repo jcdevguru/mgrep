@@ -73,7 +73,7 @@ then
   {
     type="$1"
     shift
-    echo >&2 "DEBUG [$type]: $*"
+    echo -E "DEBUG [$type]: $*" >&2 
     return 0
   }
 else
@@ -177,7 +177,7 @@ function find_path_args() {
 
 function quote_pattern() {
   local pat="$1"
-  echo "'${pat:gs/"'"/'\"'\"'}'"
+  echo -E "'${pat:gs/"'"/'\"'\"'}'"
 }
 
 function quote_patterns() {
@@ -189,6 +189,7 @@ function quote_patterns() {
   done
 
   printf "%s " "${rc[@]}"
+  echo ""
 }
 
 function extract_flags()
@@ -274,13 +275,13 @@ function gen_match()
     fi
   fi
 
-  echo \
+  echo -E \
     xargs -0 "$matcher" \
       $first_opt \
       $zero_opt \
       $file_opt \
       $opts \
-      $(quote_pattern "$pat")
+      "$(quote_pattern "$pat")"
   return 0
 }
 
