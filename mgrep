@@ -213,6 +213,39 @@ function extract_flags()
   return $next
 }
 
+filter_paths() {
+  local mode="$1"
+  shift
+  local patterns=("$@")
+  
+  while IFS= read -r -d '' path; do
+    local match=0
+    case "$mode" in
+      of|xf)
+        for pattern in "${patterns[@]}"; do
+          if [[ "$path" == ${~pattern} || "$path" == */${~pattern} ]]; then
+            match=1
+            break
+          fi
+        done
+        ;;
+      od|xd)
+        for pattern in "${patterns[@]}"; do
+          if [[ "$path" == ${~pattern}/* || "$path" == */${~pattern}/* ]]; then
+            match=1
+            break
+          fi
+        done
+        ;;
+    esac
+    
+    # flip match value based on whether or not we are excluding
+    [[ "$mode" == x[df] ]] && match=$((1-match))
+    [[ $match -eq 1 ]] && printf "%s\0" "$path"
+  done
+}
+  
+
 function gen_match()
 {
   local pat="$1"
@@ -278,45 +311,6 @@ fi
 if [[ $github == 1 ]]
 then
   command="git ls-files -z ."
-  
-  # Function to apply file and directory patterns
-  filter_paths() {
-    local mode="$1"
-    shift
-    local patterns=("$@")
-    
-    while IFS= read -r -d '' path; do
-      local match=0
-      case "$mode" in
-        of|xf)
-          for pattern in "${patterns[@]}"; do
-            if [[ "$path" == ${~pattern} || "$path" == */${~pattern} ]]; then
-              match=1
-              break
-            fi
-          done
-          ;;
-        od|xd)
-          for pattern in "${patterns[@]}"; do
-            if [[ "$path" == ${~pattern}/* || "$path" == */${~pattern}/* ]]; then
-              match=1
-              break
-            fi
-          done
-          ;;
-      esac
-      
-      # flip match value based on whether or not we are excluding
-      [[ "$mode" == x[df] ]] && match=$((1-match))
-      [[ $match -eq 1 ]] && printf "%s\0" "$path"
-    done
-  }
-  
-  # Helper function to safely quote patterns
-  quote_patterns() {
-    local arr=("$@")
-    printf "'%s' " "${arr[@]}"
-  }
   
   # Apply directory exclusions
   if [[ "${xd[@]}" != "" ]]; then
