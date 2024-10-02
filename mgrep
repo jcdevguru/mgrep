@@ -4,7 +4,7 @@
 # that each contain occurrences of multiple strings
 
 # Flags with '+' are processed by this script
-# Flags with '-' are passed to egrep
+# Flags with '-' are passed to egrep (or whatever matcher is provided)
 
 # Toggle options (lowercase = ON, uppercase = OFF):
 
@@ -26,6 +26,10 @@
 
 
 # Defaults
+
+# Use egrep to match strings in files
+matcher=egrep
+
 # Do not show matched results, just files
 show=0
 
@@ -91,6 +95,9 @@ do
   case "$1" in
     +s)    show=1 ;;
     +S)    show=0 ;;
+    +g)    github=1 ;;
+    +G)    github=0 ;;
+    +m=*)  matcher="${1#+m=}" ;;
     +xf=*) v="${1#+xf=}"; a=(${(ps.,.)v}); xf+=(${a[@]}) ;;
     +xd=*) v="${1#+xd=}"; a=(${(ps.,.)v}); xd+=(${a[@]}) ;;
     +of=*) v="${1#+of=}"; a=(${(ps.,.)v}); of+=(${a[@]}) ;;
@@ -99,8 +106,6 @@ do
     +ixd=*) xd+="${1#+ixd=}" ;;
     +iof=*) of+="${1#+iof=}" ;;
     +iod=*) od+="${1#+iod=}" ;;
-    +g)    github=1 ;;
-    +G)    github=0 ;;
     +[dDnN]|+i=*) ;;
     *) echo >&2 "$0: unknown flag '$1'"; exit 1;;
   esac
@@ -208,7 +213,7 @@ function extract_flags()
   return $next
 }
 
-function gen_egrep()
+function gen_match()
 {
   local pat="$1"
   local first="$2"
@@ -237,7 +242,7 @@ function gen_egrep()
   fi
 
   echo \
-    xargs -0 egrep \
+    xargs -0 "$matcher" \
       $first_opt \
       $zero_opt \
       $file_opt \
@@ -372,7 +377,7 @@ arg_count=${#args[@]}
 
 while (( $arg_idx < $arg_count ))
 do
-    egrep_options=$(extract_flags $arg_idx ${args[@]})
+    match_options=$(extract_flags $arg_idx ${args[@]})
     arg_idx=$?
 
     pat="${args[@]:$arg_idx:1}"
@@ -390,7 +395,7 @@ do
       fi
     fi
 
-    command="${command} | "$(gen_egrep "$pat" $is_first $is_last $show_arg $egrep_options)
+    command="${command} | "$(gen_match "$pat" $is_first $is_last $show_arg $match_options)
     arg_idx=$((arg_idx + 1))
 done
 
@@ -414,13 +419,13 @@ else
   arg_idx=0
   while (( $arg_idx < $arg_count ))
   do
-    egrep_options=$(extract_flags $arg_idx ${args[@]})
+    match_options=$(extract_flags $arg_idx ${args[@]})
     arg_idx=$?
 
     pat="${args[@]:$arg_idx:1}"
 
 
-    cmd="$(gen_egrep "$pat" 0 1 1 $egrep_options) < $match_data_file"
+    cmd="$(gen_match "$pat" 0 1 1 $match_options) < $match_data_file"
     dlog execute command = "[$cmd]"
     if (( $dry_run == 0 ))
     then
