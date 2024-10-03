@@ -213,20 +213,26 @@ filter_paths() {
   shift
   local patterns=("$@")
   
-  while IFS= read -r -d '' path; do
+  while IFS= read -r -d '' filepath
+  do
     local match=0
     case "$mode" in
       of|xf)
-        for pattern in "${patterns[@]}"; do
-          if [[ "$path" == ${~pattern} || "$path" == */${~pattern} ]]; then
+        filename=${filepath:t}
+        for pattern in "${patterns[@]}"
+        do
+          if [[ "$filename" == ${~pattern} ]]
+          then
             match=1
             break
           fi
         done
         ;;
       od|xd)
-        for pattern in "${patterns[@]}"; do
-          if [[ "$path" == ${~pattern}/* || "$path" == */${~pattern}/* ]]; then
+        for pattern in "${patterns[@]}"
+        do
+          if [[ "$filepath" == */${~pattern}/* || "$filepath" == ${~pattern}/* ]]
+          then
             match=1
             break
           fi
@@ -236,7 +242,7 @@ filter_paths() {
     
     # flip match value based on whether or not we are excluding
     [[ "$mode" == x[df] ]] && match=$((1-match))
-    [[ $match -eq 1 ]] && printf "%s\0" "$path"
+    [[ $match -eq 1 ]] && printf "%s\0" "$filepath"
   done
 }
   
