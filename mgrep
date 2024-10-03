@@ -136,12 +136,6 @@ dlog options \
   od="(${od[@]})"\
   init="'$init'"
 
-if [[ "${of}" != "" && "${xf}" != "" ]]
-then
-  dlog process not using file exclusion due to specific file targets
-  unset xf
-fi
-
 function find_args()
 {
   flag="$1"
@@ -327,6 +321,7 @@ then
   if [[ "${of[@]}" != "" ]]; then
     command+=" | filter_paths of $(quote_patterns "${of[@]}")"
   fi
+
   if [[ "${xf[@]}" != "" ]]; then
     command+=" | filter_paths xf $(quote_patterns "${xf[@]}")"
   fi
@@ -335,30 +330,31 @@ else
   command="find ."
 
   exclude_dirs=$(find_name_args "${xd[@]}")
-  only_paths=$(find_path_args "${od[@]}")
 
   if [[ "$exclude_dirs" != "" ]]
   then
     command+=" \( -type d \( $exclude_dirs \) ! -name . -prune \) -o"
   fi
 
+  command+=" -type f" 
+
+  exclude_files=$(find_name_args "${xf[@]}")
+  only_files=$(find_name_args "${of[@]}")
+  only_paths=$(find_path_args "${od[@]}")
+
   if [[ "$only_paths" != "" ]]
   then
     command+=" \( $only_paths \)"
   fi
+  
+  if [[ "$only_files" != "" ]]
+  then
+    command+=" \( $only_files \)"
+  fi
 
-  command+=" -type f" 
-
-  exclude_files=$(find_name_args "${xf[@]}")
   if [[ "$exclude_files" != "" ]]
   then
     command+=" ! \( $exclude_files \)"
-  else
-    only_files=$(find_name_args "${of[@]}")
-    if [[ "$only_files" != "" ]]
-    then
-      command+=" \( $only_files \)"
-    fi
   fi
 
   command+=" -print0"

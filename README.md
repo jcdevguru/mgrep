@@ -299,19 +299,19 @@ which ignores all directories named with a leading `.` (not including `.`, of co
 You can also use `mgrep` with `+od` to look only under certain directories by name, excluding all others.  You can use wildcards here as well.
 
 ```sh
-mgrep +G +od='node_modules,.npm*' eslint airbnb
+mgrep +G +xd=.git +od='node_modules,.npm*' eslint airbnb
 ```
 
-The above would cause the initial file list to include plain files under in hierarchies under directories named `node_modules` or with names that start with name `.npm`:
+The above would cause the search to occur only on plain files in directory hierarchies that are under directories name `node_modules` or under `.npm*` but nowhere under `.git`:
 
 ```sh
-find . \( -type d ! \( -name 'node_modules' -o -name '.npm*' -o -name '.git' \) ! -name . -prune \) -o -type f -print0
+find . \( -type d ! \( -name '.git' \) ! -name . -prune \) -o -type f -path='*/node_modules/*' -o -path='*/.npm*/*' -print0
 
 ```
 
 ### Raw search, but only inside or outside certain text files
 
-Like `+xd` or `+od`, you can use `+xf` or `+of` to exclude or include certain text files (respectively). The command line will accept both flags at once but since `+of` selects the files to use at the exclusion of others, `+xf` will be ignored when `+of` is used.
+Like `+xd` and `+od`, you can use `+xf` or `+of` to exclude or include certain text files (respectively).
 
 The command:
 
