@@ -2,63 +2,70 @@
 
 FAIL_CNT=0
 INPUT_DIR=input
+BASELINE_DIR=baseline
 
 function run_test()
 {
-	desc="$1"
-	expected_status=$2
-	expected="$3"
+  local baseline_root="$1"
+	local desc="$2"
+	local expected_status=$3
 	shift 3
-	rc=0
+
+	local rc=0
+	local actual=''
 	
 	actual="$(../../mgrep "$@" 2>/dev/null)"
-	st=$?
-	if [ $st -ne $expected_status ]
+	local st=$?
+	if [[ $st != $expected_status ]]
 	then
 		echo "$desc: FAIL - expected exit status $expected_status, got $st"
 		rc=1
-	elif [ $st -ne 0 ]
-	then
-			echo "$desc": OK
-	else
-		actual_fmt=$(echo "$actual" | sort)
-		expected_fmt=$(echo "$expected" | sort)
-		if [ "$actual_fmt" = "$expected_fmt" ]
-		then
-			echo "$desc": OK
-		else
-			echo "$desc": 'FAIL - expected "'"$expected_fmt"'", got "'"$actual_fmt"'"'
-			diff <(echo "$expected_fmt") <(echo "$actual_fmt")
-			rc=1
-		fi
-	fi
-	FAIL_CNT=$((FAIL_CNT+!!rc))
+	elif [[ "$baseline_root" != "-" ]]
+  then
+    local baseline_file="${baseline_root}.txt"
+    local baseline_path="../$BASELINE_DIR/$baseline_file"
+    local expected=$(cat "$baseline_path")
+    if [[ "$actual" != "$expected" ]]
+    then
+      echo "${desc}: FAIL - actual != contents of '$baseline_file'"
+      diff "$baseline_path" <(echo "$actual")
+      rc=1
+    fi
+  fi
+    
+  if [[ $rc == 0 ]]
+  then
+    echo "$desc": OK
+  else
+    FAIL_CNT=$((FAIL_CNT+1))
+  fi
+
 	return $rc
 }
 
 cd $INPUT_DIR || { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
 
 # Usage errors
-run_test "Usage - no arguments (error)" 1 "" 
-run_test "Usage - end with mgrep flag (error)" 1 +s 
-run_test "Usage - end with egrep flag (error)" 1 -i
-run_test "Usage - unknown flag (error)" 1 "+@" 
+run_test - "Usage - no arguments (error)" 1
+run_test - "Usage - end with mgrep flag (error)" 1 +s 
+run_test - "Usage - end with egrep flag (error)" 1 -i
+run_test - "Usage - unknown flag (error)" 1 "+@" 
 
 # Basic
-run_test "Basic - 1 string, no matches (1 exit status)" 1 "" NOTHING
-run_test "Basic - 1 string, 1 file" 0 "01.txt" hello
-run_test "Basic - 1 string, >1 file" 0 "01.txt\n02.txt" cases
-run_test "Basic - 1 string, 1 file (case-sensitive default)" 0 "02.txt" Case
-run_test "Basic - 1 string, >1 file (case-insensitive match with flag)" 0 "01.txt\n02.txt" -i Case
-run_test "Basic - 1 string, 1 file, show matches" 0 "01.txt:Hello MIXED CASES" +s MIXED
+run_test b01 "Basic - 1 string, no matches (1 exit status)" 1 NOTHING
+run_test b02 "Basic - 1 string, 1 file" 0 hello
+run_test b03 "Basic - 1 string, >1 file" 0 cases
+run_test b04 "Basic - 1 string, 1 file (case-sensitive default)" 0 Case
+run_test b05 "Basic - 1 string, >1 file (case-insensitive match with flag)" 0 -i Case
+run_test b06 "Basic - 1 string, 1 file, show matches" 0 +s MIXED
 
 # Simple
-run_test "Simple - 2 strings in 1 file, separate lines" 0 "01.txt" lower cases
-run_test "Simple - filename with spaces" 0 "a b c.txt" spacey
-run_test "Simple - filename with spaces, show matches" 0 "a b c.txt:spacey file" +s spacey
-run_test "Simple - 1 string, +1 file, show matches (case insensitive)" 0 "01.txt:Hello mixed cases\n01.txt:Hello MIXED CASES\n02.txt:Cases matter\n02.txt:cases can matter\n02.txt:cases like this are difficult" +s -i cases
+run_test s01 "Simple - 2 strings in 1 file, separate lines" 0 lower cases
+run_test s02 "Simple - filename with spaces" 0 spacey
+run_test s03 "Simple - filename with spaces, show matches" 0 +s spacey
+run_test s04 "Simple - 1 string, +1 file, show matches (case insensitive)" 0 +s -i cases
 
 # Moderate
-run_test "Moderate - 2 strings, +1 file, show matches (case sensitive)" 0 "01.txt:hello lower case string\n01.txt:Hello mixed cases\n01.txt:this is a case for Sherlock Holmes\n02.txt:cases can matter\n02.txt:cases like this are difficult\n01.txt:hello lower case string\n02.txt:string up" +s "case" string
+run_test m01 "Moderate - 2 strings, +1 file, show matches (case sensitive)" 0 +s "case" string
 
 echo "Tests complete. Error count = $FAIL_CNT"

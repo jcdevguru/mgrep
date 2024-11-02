@@ -1,0 +1,5 @@
+01.txt:Hello mixed cases
+01.txt:Hello MIXED CASES
+02.txt:Cases matter
+02.txt:cases can matter
+02.txt:cases like this are difficult

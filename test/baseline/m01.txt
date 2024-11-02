@@ -1,0 +1,7 @@
+01.txt:hello lower case string
+01.txt:Hello mixed cases
+01.txt:this is a case for Sherlock Holmes
+02.txt:cases can matter
+02.txt:cases like this are difficult
+01.txt:hello lower case string
+02.txt:string up
