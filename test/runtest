@@ -37,19 +37,27 @@ function run_test()
 
 cd test_base || { echo >&2 "missing directory 'test_base' - exiting"; exit 1; }
 
+# Usage errors
 run_test "Usage - no arguments (error)" 1 "" 
-run_test "Usage - end with flag (error)" 1 +s 
+run_test "Usage - end with mgrep flag (error)" 1 +s 
+run_test "Usage - end with egrep flag (error)" 1 -i
+run_test "Usage - unknown flag (error)" 1 "+@" 
 
+# Basic
 run_test "Basic - 1 string, no matches (1 exit status)" 1 "" NOTHING
 run_test "Basic - 1 string, 1 file" 0 "01.txt" hello
-run_test "Basic - 1 string, >1 file" 0 "01.txt\n02.txt" case
+run_test "Basic - 1 string, >1 file" 0 "01.txt\n02.txt" cases
 run_test "Basic - 1 string, 1 file (case-sensitive default)" 0 "02.txt" Case
 run_test "Basic - 1 string, >1 file (case-insensitive match with flag)" 0 "01.txt\n02.txt" -i Case
-run_test "Basic - 1 string, 1 file, show matches" 0 "01.txt:Hello MIXED CASE" +s MIXED
+run_test "Basic - 1 string, 1 file, show matches" 0 "01.txt:Hello MIXED CASES" +s MIXED
 
-run_test "Simple - 2 strings in 1 file, separate lines" 0 "01.txt" lower case
+# Simple
+run_test "Simple - 2 strings in 1 file, separate lines" 0 "01.txt" lower cases
 run_test "Simple - filename with spaces" 0 "a b c.txt" spacey
 run_test "Simple - filename with spaces, show matches" 0 "a b c.txt:spacey file" +s spacey
-run_test "Simple - 1 string > 1 file, show matches (case insensitive)" 0 "01.txt:Hello MIXED CASE\n01.txt:Hello mixed case \n01.txt:hello lower case string\n02.txt:Case matters\n02.txt:case can matter\n02.txt:cases like this are difficult" +s -i case
+run_test "Simple - 1 string, +1 file, show matches (case insensitive)" 0 "01.txt:Hello mixed cases\n01.txt:Hello MIXED CASES\n02.txt:Cases matter\n02.txt:cases can matter\n02.txt:cases like this are difficult" +s -i cases
+
+# Moderate
+run_test "Moderate - 2 strings, +1 file, show matches (case sensitive)" 0 "01.txt:hello lower case string\n01.txt:Hello mixed cases\n01.txt:this is a case for Sherlock Holmes\n02.txt:cases can matter\n02.txt:cases like this are difficult\n01.txt:hello lower case string\n02.txt:string up" +s "case" string
 
 echo "Tests complete. Error count = $FAIL_CNT"

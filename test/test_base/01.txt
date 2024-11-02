@@ -1,4 +1,4 @@
 hello lower case string
-Hello mixed case 
-Hello MIXED CASE
-
+Hello mixed cases
+Hello MIXED CASES
+this is a case for Sherlock Holmes

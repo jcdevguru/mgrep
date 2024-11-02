@@ -1,5 +1,5 @@
 goodbye 
-Case matters
-case can matter
+Cases matter
+cases can matter
 cases like this are difficult
-
+string up
