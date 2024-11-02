@@ -1,6 +1,7 @@
 #!/bin/zsh
 
 FAIL_CNT=0
+INPUT_DIR=input
 
 function run_test()
 {
@@ -35,7 +36,7 @@ function run_test()
 	return $rc
 }
 
-cd test_base || { echo >&2 "missing directory 'test_base' - exiting"; exit 1; }
+cd $INPUT_DIR || { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
 
 # Usage errors
 run_test "Usage - no arguments (error)" 1 "" 
