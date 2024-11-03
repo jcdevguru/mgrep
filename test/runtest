@@ -60,6 +60,25 @@ run_test - "Usage - unknown flag (error)" 1 "+@"
 run_test f01 "Flag - only .txt files" 0 +of='*.txt' string
 run_test f02 "Flag - no .txt files" 0 +xf='*.txt' string
 
+# Filter by Github files
+ngpfx="nongit"
+pid=$$
+(
+  # Using subshell to manage file
+  clean='rm -f ${ngpfx}*; exit 0'
+  ( eval $clean ) 2>/dev/null
+
+  ngfile="${ngpfx}-${pid}.txt"
+  srch="remove me: ${pid}"
+
+  trap "$clean" 1 2 3 15
+  echo "$srch" > $ngfile
+
+  run_test - "Flag - use Github to list files (no match)" 1 +g "$srch"
+  run_test - "Flag - do not use Github to list files (match)" 0 +G "$srch"
+  eval $clean
+)
+
 # Basic
 run_test b01 "Basic - 1 string, no matches (1 exit status)" 1 NOTHING
 run_test b02 "Basic - 1 string, 1 file" 0 hello
