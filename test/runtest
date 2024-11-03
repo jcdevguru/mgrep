@@ -45,11 +45,20 @@ function run_test()
 
 cd $INPUT_DIR || { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
 
-# Usage errors
+# Unless otherwise noted, all files must be under Github control
+# since default for mgrep is to use Github to list files
+
+## Usage errors
 run_test - "Usage - no arguments (error)" 1
 run_test - "Usage - end with mgrep flag (error)" 1 +s 
 run_test - "Usage - end with egrep flag (error)" 1 -i
 run_test - "Usage - unknown flag (error)" 1 "+@" 
+
+## Filter tests
+
+# Filter by file names
+run_test f01 "Flag - only .txt files" 0 +of='*.txt' string
+run_test f02 "Flag - no .txt files" 0 +xf='*.txt' string
 
 # Basic
 run_test b01 "Basic - 1 string, no matches (1 exit status)" 1 NOTHING
