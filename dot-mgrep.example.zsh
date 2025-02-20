@@ -19,6 +19,10 @@ ignore_pnpm_artifact() {
   xf+=(pnpm-lock.yaml pnpm-workspace.yaml)
 }
 
+ignore_yarn_artifact() {
+  xf+=(yarn.lock)
+}
+
 ignore_vim() {
   xf+=('.vim*' viminfo .exrc))
 }
@@ -30,6 +34,7 @@ ignore_minified() {
 ignore_package_manager_artifact() {
   ignore_npm_artifact
   ignore_pnpm_artifact
+  ignore_yarn_artifact
 }
 
 ignore_version_managers() {
@@ -38,9 +43,8 @@ ignore_version_managers() {
 
 dev_no_github() {
   ignore_github
-  ignore_artifact
   ignore_vim
-  ignore_package_managers
+  ignore_package_manager_artifact
 }
 
 dev_github() {
@@ -54,9 +58,10 @@ ignore_magento_artifact() {
 
 # Sample preferences for a developer who
 # uses Github but is not interested in
-# lock files from package managers, and
-# where minified files are tracked in Github
+# lock files from package managers, tool
+# configurations, or minified files
 
 dev_github
 ignore_minified
 ignore_package_manager_artifact
+ignore_version_managers
