@@ -6,7 +6,17 @@
 
 ## mgrep: search files for multiple terms in a source hierarchy
 
-Developers often search through source files to find occurrences of a particular text string in hopes of locating what files are relevant to a particular subject. However, a search with just one string tends to be ineffective for uncovering all the code that is relevant.  One simple string will match too many files, and, if the string is made overly nuanced and complicated, relevant pieces of code will be missed.  A far more powerful search can be had by searching for more than one string at once to find files that contain all those strings.
+Often, we are stuck having to search for text through a large number of files, and suffer from the problem of "too much" or "not enough."  Developers especially know this - we are often tasked with the need to find a piece of code, and although `egrep` and its variants are excellent low-level commands for searching, what they deliver in flexibility comes at the expense of usability.  One simple string search will match too many files.  A longer, more complicated version - after some painful minutes crafting a clever regular expression to cover all the possibilities - will end up getting it all wrong.
+
+Though it takes work, we often find exactly what we need by finding what files contain both of two strings.  That is, when two individual strings appear together in the same file, we have a far better chance of it being on the subject we are searching than if it is contained just one of them. We can - and often do - turn to the "grep" family to assist us, but while quite good at showing us *lines* that contain more than one of a string, they are not so easily coaked into showing us *files* when the strings are on separate lines.   We can make a *grep*-style command do this by running it multiple times - first, by finding files that contain one string, and then by using that list as input to another "grep" command to search for the second string. This, too, can end up being complicated - you're trying to find some code - did you really have time to write a shell script to make it happen?
+
+You are in luck.  *I* wrote you that shell script.  It really is just that - a wrapper to `egrep` (or any other "grep" you prefer) - and I took care of all the stuff that usually gets in the way.
+
+I don't expect any thanks.  Just run it, share it, and enjoy - but let me know if something goes wrong.  But if you want to tell me about the time it saves you, I'll be very happy.
+
+Here are use cases and explanations.
+
+### A typical example - finding code
 
 For example, suppose we were working in Node JS and wanted to find uses of the [Lodash](https://lodash.com) function `reduce` in an effort to change the code to use the native ES6 version of `Array.reduce()`. A way to start is to search for files that contain the word `lodash`, but the search would match any use of `lodash`, not just for `reduce`. If we searched for `reduce` on its own, we would find any occurrence of that word, which also would be too general.  If we then decided to make the search more specific and look just for `lodash.reduce` or `_.reduce` we would get closer to finding what we need, but would inevitably miss some occurrences, since Lodash's `reduce` function can be used without specifically referencing the library. For example:
 
@@ -18,15 +28,15 @@ const reducedArray = reduce(srcArray...);
 
 This call to `lodash`'s version of `reduce` would be missed.
 
-Clearly, our chances for success would go up considerably if we could search for files that contain *both* the words `lodash` and `reduce`.   However, to do this on the command line with calls to UNIX command line utilities like `find` and `egrep` would be cumbersome, since we would first have to find all the files that contain the word `lodash`, and then find occcurrences of `reduce` from those files alone.  This would require a tedious set of commands that require you to save file lists, fashion command lines, and so on.  What if we could just wrap a search for several strings all together in one command, and locate only the files that contain all of them?
+Clearly, our chances for success would go up considerably if we could search for files that contain *both* the words `lodash` and `reduce`.   However, to do this on the command line with calls to UNIX command line utilities like `find` and `egrep` would be cumbersome, since we would first have to find all the files that contain the word `lodash`, and then find occcurrences of `reduce` from those files alone.  This would require a tedious set of commands that require you to save file lists, fashion command lines, and so on.  
 
-That is exactly what `mgrep` does.  Here is the command line:
+That is exactly what `mgrep` does for you.  Here is the command line:
 
 ```sh
 mgrep -w lodash -w reduce
 ```
 
-The output will be a list of all the files in and below the current directory that contain occurrences of both `lodash` and `reduce` as distinct words, in any order, and not necessarily on the same line of text. The search for multiple strings at once is far more likely to match our objective than searches for just one string, and `mgrep` makes this convenient and simple.
+The output will be a list of all the files (in and below the current directory) that contain occurrences of both `lodash` and `reduce` as distinct words, in any order, and not necessarily within the same line of text. The search for multiple strings at once is far more likely to match our objective than searches for just one string, and `mgrep` makes this convenient and simple.
 
 ---
 
@@ -68,22 +78,22 @@ However, we would not.  You would instead see a partial result, with error messa
 all.js: No such file or directory
 ```
 
-Although the `find...egrep` subcommand correctly listed all the files that contained `forEach`, the space in the file name `test all.js` caused the shell to provide `./test/test` and `all.js` to the outer `egrep` command as separate file arguments.  This caused the operation to fail.
+Although the subcommand withing `$(...)` correctly listed all the files that contained `forEach`, the space in the file name `test all.js` caused the shell to provide `./test/test` and `all.js` to the outer `egrep` command as separate file arguments.  This caused the operation to fail.
 
-Here are a few other complications to consider:
+Spaces in file names might be exotic, but here are some other, more common complications to consider:
 
 - Shell expansion syntax shown above won't work easily with multiple levels of expansion, which means three or more strings are hard to search at once
 - You will search files and directories you probably don't care about, such as `.git`, git-ignored files, or software installation folders (e.g., `node_modules`)
 - `egrep` will (by default) open and match non-textual files, which is usually not useful and will slow the search down unnecessarily
-- The expansion of the `find...egrep` command might provide so many file names that the shell command line will hit system limits and fail
+- Just expanding the output of a command with `$(...)` may provide so many file names that the shell command line will hit system limits and fail
 
-Now let's see what `mgrep` does to address these issues.
+`mgrep` manages all of the above, as explained below.
 
 ---
 
 ### What mgrep does to make this work
 
-Now let's try the above search with `mgrep`:
+First, let's try out the above case with `mgrep` and see what happens to make it work:
 
 ```sh
 mgrep forEach iterate
@@ -105,34 +115,40 @@ xargs -0 \
     iterate
 ```
 
-This means the only files that will be searched are non-binary files tracked recognized by `git`, and the NULL-delimiting options in `git ls-files`, `xargs` and `egrep` will be used to handle file names that contain any characters, including spaces.
-
-The result will then be correct, fixing the problem described in the previous section.
+In the search for `foreEach`, the commands `git ls-files`, `xargs`, and `egrep` will cause all non-binary files tracked by Github to be searched and file names to be processed with NULL delimitation.  That allows us to ignore the uninteresting files as well as preserve the space correctly when sending it to the next command, in this form:
 
 ```
-src/array-utils.js
-app/search.js
-test/test all.js
+src/array-utils.js\0app/search.js\0test/test all.js
 ```
+
+The second command, which begins with `xargs -0`, will supply these files to `egrep` directly, without using the shell to expand them into a list. Even though `test all.js` has a space in its name, the file will be opened and searched correctly.  `mgrep` will then show its final results correctly.
+
+```
+./src/array-utils.js
+./app/search.js
+./test/test all.js
+```
+
+**No errors!!**
 
 ---
 
 ## Options
 
-`mgrep` accepts flags that start with `+`, not `-`, since flags that begin with `-` are passed to `egrep` (see below).  You can have multiple occurrences of flags to use for filtering.
+`mgrep` accepts flags that start with `+`, not `-`, since flags that begin with `-` are passed to `egrep` (see below).  You can have multiple occurrences of flags to use for filtering. 
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| +d, +D | Turn on and off debug messages | Off |
-| +s, +S | Show or do not show matching strings | Off |
-| +g, +G | Use github ls-files for starting paths if available | On |
-| +i=cmd | Initialize options with command | None |
-| +n, +N | Dry run: apply debugging but do not execute search | Off |
-| +xd=pat1[,pat2,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
-| +od=pat1[,pat2,...] | Search only under directories whose names match any pattern in comma-separated list| None |
-| +xf=pat1[,pat2,...] | Ignore plain files whose names match any pattern in comma-separated list| None |
-| +of=pat1[,pat2,...] | Search only in hierarchy under directory with name that matches any pattern in comma-separated list | None |
-| +ixd=pat +iod=pat +ixf=pat +iof=pat | Same as +xd, +od, +xf, +of, except without comma-separation | None |
+| `+d`, `+D` | Turn on (`+d`) or off (`+D`) debug messages | Off |
+| `+s`, `+S` | Show (`+s`) or do not show (`+S`) matching strings | Off |
+| `+g`, `+G` | Use `github ls-files` (`+g`), or bypass Github (`+G`), for files to search if in Github directory | On |
+| `+i=`*cmd* | Initialize options with command *cmd* | None |
+| `+n`, `+N` | Dry run: apply (`+n`) or do not apply (`+N`) debugging and do not execute search | Off |
+| `+xd=`*pat1*[,*pat2*,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
+| `+od=`*pat1*[,*pat2*,...] | Search only under directories whose names match any pattern in comma-separated list| None |
+| `+xf=`*pat1*[,*pat2*,...] | Ignore plain files whose names match any pattern in comma-separated list| None |
+| `+of=`*pat1*[,*pat2*,...] | Search only in hierarchy under directory with name that matches any pattern in comma-separated list | None |
+| `+ixd=`*pat* `+iod=`*pat* `+ixf=`*pat* `+iof=`*pat* | Same as `+xd`, `+od`, `+xf`, `+of`, except without comma-separation | None |
 
 The options that select or ignore files and directories (`xd`, `od`, `xf`, `of`, and variants that start with the letter `i`) have the following features:
 
