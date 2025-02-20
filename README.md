@@ -119,20 +119,20 @@ test/test all.js
 
 ## Options
 
-`mgrep` accepts flags that start with `+`, not `-`, since flags that begin with `-` are passed to `egrep` (see below).  You can have multiple occurrences of flags to use for filtering.
+`mgrep` accepts flags that start with `+`, not `-`, since flags that begin with `-` are passed to `egrep` (see below).  You can have multiple occurrences of flags to use for filtering. 
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| +d, +D | Turn on and off debug messages | Off |
-| +s, +S | Show or do not show matching strings | Off |
-| +g, +G | Use github ls-files for starting paths if available | On |
-| +i=cmd | Initialize options with command | None |
-| +n, +N | Dry run: apply debugging but do not execute search | Off |
-| +xd=pat1[,pat2,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
-| +od=pat1[,pat2,...] | Search only under directories whose names match any pattern in comma-separated list| None |
-| +xf=pat1[,pat2,...] | Ignore plain files whose names match any pattern in comma-separated list| None |
-| +of=pat1[,pat2,...] | Search only in hierarchy under directory with name that matches any pattern in comma-separated list | None |
-| +ixd=pat +iod=pat +ixf=pat +iof=pat | Same as +xd, +od, +xf, +of, except without comma-separation | None |
+| `+d`, `+D` | Turn on (`+d`) or off (`+D`) debug messages | Off |
+| `+s`, `+S` | Show (`+s`) or do not show (`+S`) matching strings | Off |
+| `+g`, `+G` | Use `github ls-files` (`+g`), or bypass Github (`+G`), for files to search if in Github directory | On |
+| `+i=`*cmd* | Initialize options with command *cmd* | None |
+| `+n`, `+N` | Dry run: apply (`+n`) or do not apply (`+N`) debugging and do not execute search | Off |
+| `+xd=`*pat1*[,*pat2*,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
+| `+od=`*pat1*[,*pat2*,...] | Search only under directories whose names match any pattern in comma-separated list| None |
+| `+xf=`*pat1*[,*pat2*,...] | Ignore plain files whose names match any pattern in comma-separated list| None |
+| `+of=`*pat1*[,*pat2*,...] | Search only in hierarchy under directory with name that matches any pattern in comma-separated list | None |
+| `+ixd=`*pat* `+iod=`*pat* `+ixf=`*pat* `+iof=`*pat* | Same as `+xd`, `+od`, `+xf`, `+of`, except without comma-separation | None |
 
 The options that select or ignore files and directories (`xd`, `od`, `xf`, `of`, and variants that start with the letter `i`) have the following features:
 
