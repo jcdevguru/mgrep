@@ -1,62 +1,115 @@
 #!/bin/zsh
 declare -a xf xd od of
-
+ 
 # Examples of configurations
 # Write shell functions to set options
-
-ignore_github() {
-  github=0
-  xf+=(.gitignore)
-  xd+=(.git)
-}
-
-ignore_npm_artifact() {
-  xd+=(.npm node_modules)
-  xf+=(package-lock.json)
-}
-
-ignore_pnpm_artifact() {
-  xf+=(pnpm-lock.yaml pnpm-workspace.yaml)
-}
-
+ 
 ignore_vim() {
-  xf+=('.vim*' viminfo .exrc))
+  xf+=('.vim*' viminfo .exrc)
 }
-
-ignore_minified() {
-  xf+=('*.min.js' '*.min.css')
+ 
+ignore_zshell_artifact() {
+  xf+=(.z .zsh_history)
 }
-
-ignore_package_manager_artifact() {
-  ignore_npm_artifact
-  ignore_pnpm_artifact
-}
-
+ 
 ignore_version_managers() {
   xf+=('.nvm*' '.asdf*' .tool-versions)
 }
-
-dev_no_github() {
-  ignore_github
-  ignore_artifact
+ 
+ignore_github_dir() {
+  xd+=(.git)
+}
+ 
+ignore_tool_dirs() {
+  # Local History VS Code plugin
+  xd+=(.history)
+}
+ 
+ignore_npm_artifact() {
+  xd+=(.npm)
+  xf+=(package-lock.json)
+}
+ 
+ignore_node_modules() {
+  xd+=(.node_modules)
+}
+ 
+ignore_pnpm_artifact() {
+  xf+=(pnpm-lock.yaml)
+}
+ 
+ignore_yarn_artifact() {
+  xf+=(yarn.lock)
+  xd+=(.yarn)
+}
+ 
+ignore_package_manager_artifact() {
+  ignore_npm_artifact
+  ignore_pnpm_artifact
+  ignore_yarn_artifact
+}
+ 
+ignore_log_artifact() {
+  xf+=('*.log')
+}
+ 
+ignore_minified() {
+  xf+=('*.min.js' '*.min.css' '*.chunk.js')
+}
+ 
+ignore_newrelic() {
+  xf+=('newRelic*.js')
+}
+ 
+ignore_source_map() {
+  xf+=('*.js.map' '*.css.map')
+}
+ 
+ignore_build_artifact() {
+  ignore_minified
+  ignore_source_map
+  xd+=(build dist .nx)
+}
+ 
+ignore_dev_artifact() {
+  ignore_package_manager_artifact
+  ignore_log_artifact
+  ignore_build_artifact
+}
+ 
+ignore_dev_config() {
+  ignore_github_dir
+  ignore_tool_dirs
+  ignore_version_managers
+}
+ 
+ignore_user_environment() {
   ignore_vim
-  ignore_package_managers
+  ignore_zshell_artifact
 }
-
-dev_github() {
-  github=1
+ 
+source_code() {
+  # Will follow Github if so configured
+  ignore_dev_artifact
+  ignore_dev_config
+  ignore_newrelic
+  ignore_user_environment
 }
-
-ignore_magento_artifact() {
-  xd+=(.composer generated 'pub*')
-  xf+=(composer.lock)
+ 
+code() {
+  # All source code - even node_modules
+  github=0
+  source_code
 }
-
-# Sample preferences for a developer who
-# uses Github but is not interested in
-# lock files from package managers, and
-# where minified files are tracked in Github
-
-dev_github
-ignore_minified
-ignore_package_manager_artifact
+ 
+# Can be used for searching multiple projects
+project_code() {
+  ignore_node_modules
+  source_code
+}
+ 
+# Default init - project search
+init_mgrep() {
+  project_code
+}
+ 
