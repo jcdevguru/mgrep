@@ -126,8 +126,10 @@ The second command, which begins with `xargs -0`, will supply these files to `eg
 ```
 ./src/array-utils.js
 ./app/search.js
-./test/test all.js: No such file or directory
+./test/test all.js
 ```
+
+**No errors!!**
 
 ---
 
