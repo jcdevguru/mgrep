@@ -144,6 +144,12 @@ then
   exit 1
 fi
 
+# Now remove all elements from "xd" & "xf" (exclude dirs, files)
+# that appear in "od", "of" (only dirs, only files)
+
+xd=("${(@)xd:#${^od}}")
+xf=("${(@)xf:#${^of}}")
+
 dlog options \
   debug="$debug"\
   dry_run="$dry_run"\
