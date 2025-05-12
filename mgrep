@@ -41,9 +41,13 @@ debug=0
 dry_run=0
 
 declare -a xf xd of od
-declare init
+default_init=init_mgrep
+init="$default_init"
 
 # Process option file, if exists
+# Get functions defined now
+before_funcs=(${(k)functions})
+
 option_files=($HOME/.mgrep .mgrep)
 for option_file in "${option_files[@]}"
 do
@@ -52,6 +56,11 @@ do
     . "$option_file"
   fi
 done
+
+# Now we see what new functions came in and make a list
+# of ones that are OK for init
+after_funcs=(${(k)functions})
+init_funcs=(${after_funcs:|before_funcs})
 
 # Process init & debug flags first
 for a in "$@"
@@ -85,8 +94,18 @@ fi
 
 if [[ "$init" != "" ]]
 then
-  dlog options initializing with command "$init"
-  eval "$init"
+  if (( ${init_funcs[(Ie)$init]} ))
+  then
+    dlog options "initializing with function '$init'"
+    eval "$init"
+  else
+    dlog options "initialization function '$init' does not exist - skipping"
+    if [[ $init != $default_init ]]
+    then
+      echo >&2 "$0: specified init function '$init' does not exist - exiting"
+      exit 1
+    fi
+  fi
 fi
 
 # Now process flags
