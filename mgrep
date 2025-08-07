@@ -317,9 +317,18 @@ then
   then
     if git -C . rev-parse 2>/dev/null
     then
-      dlog process "using git to list files (directory in git)"
+      git check-ignore -q . 2>/dev/null
+      if [[ $? == 0 ]]
+      then
+        # No files would be matched since the current directory is ignored so
+        # we have to turn off Github
+        dlog process "not using git to list files (current directory ignored by git)"
+        github=0
+      else
+        dlog process "using git to list files (directory in git)"
+      fi
     else
-      dlog process "not using git to list files (directory not in git)"
+      dlog process "not using git to list files (directory not in git project)"
       github=0
     fi
   else
