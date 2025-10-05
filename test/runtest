@@ -60,6 +60,10 @@ run_test - "Usage - unknown flag (error)" 1 "+@"
 run_test f01 "Flag - only .txt files" 0 +of='*.txt' string
 run_test f02 "Flag - no .txt files" 0 +xf='*.txt' string
 
+# Filter by directory names
+run_test d01 "Flag - only 'subdir' directory" 0 +od='subdir' string
+run_test d02 "Flag - exclude 'subdir' directory" 0 +xd='subdir' string
+
 # Filter by Github files
 ngpfx="nongit"
 pid=$$
