@@ -53,6 +53,8 @@ run_test - "Usage - no arguments (error)" 1
 run_test - "Usage - end with gper flag (error)" 1 +s 
 run_test - "Usage - end with egrep flag (error)" 1 -i
 run_test - "Usage - unknown flag (error)" 1 "+@" 
+run_test - "Usage - end with gper option terminator (error)" 1 ++
+run_test u01 "Usage - ++ permits pattern beginning with +" 0 +s ++ -F +leading
 
 ## Filter tests
 

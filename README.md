@@ -144,6 +144,7 @@ The second command, which begins with `xargs -0`, will supply these files to `eg
 | `+g`, `+G` | Use `github ls-files` (`+g`), or bypass Github (`+G`), for files to search if in Github directory | On |
 | `+i=`*cmd* | Initialize options with command *cmd* | None |
 | `+n`, `+N` | Dry run: apply (`+n`) or do not apply (`+N`) debugging and do not execute search | Off |
+| `++` | Stop processing `gper` options; subsequent arguments are matcher flags and patterns | |
 | `+xd=`*pat1*[,*pat2*,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
 | `+od=`*pat1*[,*pat2*,...] | Search only under directories whose names match any pattern in comma-separated list| None |
 | `+xf=`*pat1*[,*pat2*,...] | Ignore plain files whose names match any pattern in comma-separated list| None |

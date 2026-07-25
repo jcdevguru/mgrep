@@ -13,6 +13,7 @@
 # +g, +G: use github ls-files for starting paths if available (default: on)
 # +n, +N: dry run or do not dry run (default: off)
 # +i=cmd: initialize options with cmd (default: none)
+# ++: stop processing gper options
 
 # Filter options (may be specified multiple times, in any combination):
 #
@@ -66,6 +67,7 @@ init_funcs=(${after_funcs:|before_funcs})
 for a in "$@"
 do
   case "$a" in
+    ++)    break ;;
     +i=*) init="${a#+i=}" ;;
     +d)   debug=1 ;;
     +D)   debug=$dry_run ;;
@@ -112,6 +114,7 @@ fi
 while [[ "$1" == +* ]]
 do
   case "$1" in
+    ++)    shift; break ;;
     +s)    show=1 ;;
     +S)    show=0 ;;
     +g)    github=1 ;;
