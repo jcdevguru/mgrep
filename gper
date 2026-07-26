@@ -11,8 +11,11 @@
 # +d, +D: turn on and off debug messages (default: off)
 # +s, +S: show or do not show matching strings (default: off)
 # +g, +G: use github ls-files for starting paths if available (default: on)
+# +h: show help and exit
 # +n, +N: dry run or do not dry run (default: off)
 # +i=cmd: initialize options with cmd (default: none)
+# +c, +C: load or do not load configuration files (default: load)
+# +z, +Z: use NUL-delimited or human-readable final output (default: human-readable)
 # ++: stop processing gper options
 
 # Filter options (may be specified multiple times, in any combination):
@@ -41,22 +44,87 @@ github=1
 debug=0
 dry_run=0
 
+# Load configuration files and use human-readable output
+load_config=1
+null_output=0
+
 declare -a xf xd of od
 default_init=init_gper
 init="$default_init"
+
+function usage()
+{
+  cat <<'EOF'
+Usage: gper [gper-options] [matcher-options] pattern ...
+
+Find files that contain every pattern. Matcher options beginning with "-"
+apply to the pattern that follows them.
+
+Gper options:
+  +d, +D             Turn debug messages on or off
+  +s, +S             Show matching lines or filenames only
+  +g, +G             Use or bypass "git ls-files" when available
+  +h                 Show this help and exit
+  +n, +N             Turn dry-run mode on or off
+  +i=cmd             Initialize options with a configured function
+  +c, +C             Load or do not load .gper configuration files
+  +z, +Z             Use NUL-delimited or human-readable final output
+  +xd=patterns       Exclude directories by comma-separated name patterns
+  +od=patterns       Search only directories matching comma-separated patterns
+  +xf=patterns       Exclude files by comma-separated name patterns
+  +of=patterns       Search only files matching comma-separated name patterns
+  +ixd=pattern       Exclude directories by one literal argument
+  +iod=pattern       Search only directories matching one literal argument
+  +ixf=pattern       Exclude files by one literal argument
+  +iof=pattern       Search only files matching one literal argument
+  +m=cmd             Use cmd as the matcher
+  ++                 Stop processing gper options
+
+Examples:
+  gper -w lodash -i reduce
+  gper +s -w lodash -i reduce
+  gper +C +z -F needle
+  gper +s ++ -F +leading
+EOF
+}
+
+# Help and configuration control must be recognized before configuration files
+# are sourced. As with normal gper option processing, stop at "++" or the first
+# argument that does not begin with "+".
+show_help=0
+for a in "$@"
+do
+  case "$a" in
+    ++) break ;;
+    +h) show_help=1 ;;
+    +c) load_config=1 ;;
+    +C) load_config=0 ;;
+    +*) continue ;;
+    *)  break ;;
+  esac
+done
+
+if (( $show_help == 1 ))
+then
+  usage
+  exit 0
+fi
 
 # Process option file, if exists
 # Get functions defined now
 before_funcs=(${(k)functions})
 
-option_files=($HOME/.gper .gper)
-for option_file in "${option_files[@]}"
-do
-  if [[ -f "$option_file" ]]
-  then
-    . "$option_file"
-  fi
-done
+if (( $load_config == 1 ))
+then
+  option_files=($HOME/.gper .gper)
+  for option_file in "${option_files[@]}"
+  do
+    if [[ -f "$option_file" ]]
+    then
+      . "$option_file"
+    fi
+  done
+fi
 
 # Now we see what new functions came in and make a list
 # of ones that are OK for init
@@ -73,6 +141,7 @@ do
     +D)   debug=$dry_run ;;
     +n)   dry_run=1; debug=1 ;;
     +N)   dry_run=0 ;;
+    +[cCh]) ;;
     +*)   continue ;;
     *)    break;
   esac
@@ -119,7 +188,12 @@ do
     +S)    show=0 ;;
     +g)    github=1 ;;
     +G)    github=0 ;;
+    +c)    load_config=1 ;;
+    +C)    load_config=0 ;;
+    +h)    ;;
     +m=*)  matcher="${1#+m=}" ;;
+    +z)    null_output=1 ;;
+    +Z)    null_output=0 ;;
     +xf=*) v="${1#+xf=}"; a=(${(ps.,.)v}); xf+=(${a[@]}) ;;
     +xd=*) v="${1#+xd=}"; a=(${(ps.,.)v}); xd+=(${a[@]}) ;;
     +of=*) v="${1#+of=}"; a=(${(ps.,.)v}); of+=(${a[@]}) ;;
@@ -157,6 +231,8 @@ dlog options \
   debug="$debug"\
   dry_run="$dry_run"\
   github="$github"\
+  load_config="$load_config"\
+  null_output="$null_output"\
   show="$show"\
   xf="(${xf[@]})"\
   of="(${of[@]})"\
@@ -281,7 +357,8 @@ function gen_match()
   local first="$2"
   local last=$3
   local show="$4"
-  shift 4
+  local null_output="$5"
+  shift 5
   local opts="$@"
   local zero_opt=""
 
@@ -295,9 +372,13 @@ function gen_match()
   then
     # always include file names when showing
     file_opt=-H
+    if (( $null_output == 1 ))
+    then
+      zero_opt=--null
+    fi
   else
     file_opt=--files-with-matches
-    if (( $last == 0 ))
+    if (( $last == 0 || $null_output == 1 ))
     then
       zero_opt=--null
     fi
@@ -429,7 +510,7 @@ do
       fi
     fi
 
-    command="${command} | "$(gen_match "$pat" $is_first $is_last $show_arg $match_options)
+    command="${command} | "$(gen_match "$pat" $is_first $is_last $show_arg $null_output $match_options)
     arg_idx=$((arg_idx + 1))
 done
 
@@ -459,7 +540,7 @@ else
     pat="${args[@]:$arg_idx:1}"
 
 
-    cmd="$(gen_match "$pat" 0 1 1 $match_options) < $match_data_file"
+    cmd="$(gen_match "$pat" 0 1 1 $null_output $match_options) < $match_data_file"
     dlog execute command = "[$cmd]"
     if (( $dry_run == 0 ))
     then

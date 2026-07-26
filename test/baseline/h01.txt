@@ -1,0 +1,30 @@
+Usage: gper [gper-options] [matcher-options] pattern ...
+
+Find files that contain every pattern. Matcher options beginning with "-"
+apply to the pattern that follows them.
+
+Gper options:
+  +d, +D             Turn debug messages on or off
+  +s, +S             Show matching lines or filenames only
+  +g, +G             Use or bypass "git ls-files" when available
+  +h                 Show this help and exit
+  +n, +N             Turn dry-run mode on or off
+  +i=cmd             Initialize options with a configured function
+  +c, +C             Load or do not load .gper configuration files
+  +z, +Z             Use NUL-delimited or human-readable final output
+  +xd=patterns       Exclude directories by comma-separated name patterns
+  +od=patterns       Search only directories matching comma-separated patterns
+  +xf=patterns       Exclude files by comma-separated name patterns
+  +of=patterns       Search only files matching comma-separated name patterns
+  +ixd=pattern       Exclude directories by one literal argument
+  +iod=pattern       Search only directories matching one literal argument
+  +ixf=pattern       Exclude files by one literal argument
+  +iof=pattern       Search only files matching one literal argument
+  +m=cmd             Use cmd as the matcher
+  ++                 Stop processing gper options
+
+Examples:
+  gper -w lodash -i reduce
+  gper +s -w lodash -i reduce
+  gper +C +z -F needle
+  gper +s ++ -F +leading

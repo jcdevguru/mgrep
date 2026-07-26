@@ -142,8 +142,11 @@ The second command, which begins with `xargs -0`, will supply these files to `eg
 | `+d`, `+D` | Turn on (`+d`) or off (`+D`) debug messages | Off |
 | `+s`, `+S` | Show (`+s`) or do not show (`+S`) matching strings | Off |
 | `+g`, `+G` | Use `github ls-files` (`+g`), or bypass Github (`+G`), for files to search if in Github directory | On |
+| `+h` | Show command help and exit without loading configuration files | |
 | `+i=`*cmd* | Initialize options with command *cmd* | None |
 | `+n`, `+N` | Dry run: apply (`+n`) or do not apply (`+N`) debugging and do not execute search | Off |
+| `+c`, `+C` | Load (`+c`) or do not load (`+C`) `$HOME/.gper` and local `.gper` configuration files | On |
+| `+z`, `+Z` | Use NUL-delimited (`+z`) or human-readable (`+Z`) final output | Human-readable |
 | `++` | Stop processing `gper` options; subsequent arguments are matcher flags and patterns | |
 | `+xd=`*pat1*[,*pat2*,...] | Ignore files under directories whose names match any pattern in comma-separated list| None |
 | `+od=`*pat1*[,*pat2*,...] | Search only under directories whose names match any pattern in comma-separated list| None |
@@ -240,6 +243,16 @@ app/search.js:items.forEach(v=>v)
 app/search.js:// const iterate = (items) => {
 test/test all.js:_.forEach(item1)
 test/test all.js:// iterate over this array
+```
+
+For machine-readable output, `+z` terminates each final filename with a NUL
+byte instead of a newline. When combined with `+s`, the filename and matching
+line are separated by NUL and the matching line remains newline-terminated.
+Use `+Z` to restore the default human-readable format.
+
+```sh
+gper +z lodash reduce
+gper +s +z lodash reduce
 ```
 
 ---

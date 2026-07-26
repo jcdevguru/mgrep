@@ -3,6 +3,8 @@
 FAIL_CNT=0
 INPUT_DIR=input
 BASELINE_DIR=baseline
+TEST_HOME=$(mktemp -d "${TMPDIR:-/tmp}/gper-test-home.XXXXXX") || exit 1
+trap 'rm -rf -- "$TEST_HOME"' EXIT HUP INT TERM
 
 function run_test()
 {
@@ -14,7 +16,7 @@ function run_test()
 	local rc=0
 	local actual=''
 	
-	actual="$(../../gper "$@" 2>/dev/null)"
+	actual="$(HOME="$TEST_HOME" ../../gper "$@" 2>/dev/null)"
 	local st=$?
 	if [[ $st != $expected_status ]]
 	then
@@ -43,6 +45,64 @@ function run_test()
 	return $rc
 }
 
+function run_null_test()
+{
+  local baseline_root="$1"
+  local desc="$2"
+  local expected_status=$3
+  local baseline_mode="$4"
+  shift 4
+
+  local baseline_path="../$BASELINE_DIR/${baseline_root}.txt"
+  local actual_path=$(mktemp "${TMPDIR:-/tmp}/gper-test-actual.XXXXXX")
+  local expected_path=$(mktemp "${TMPDIR:-/tmp}/gper-test-expected.XXXXXX")
+  local rc=0
+
+  HOME="$TEST_HOME" ../../gper "$@" > "$actual_path" 2>/dev/null
+  local st=$?
+
+  case "$baseline_mode" in
+    filenames)
+      tr '\n' '\0' < "$baseline_path" > "$expected_path"
+      ;;
+    matches)
+      while IFS=: read -r filename match
+      do
+        printf '%s\0%s\n' "$filename" "$match"
+      done < "$baseline_path" > "$expected_path"
+      ;;
+    *)
+      echo "$desc: FAIL - unknown baseline mode '$baseline_mode'"
+      rc=1
+      ;;
+  esac
+
+  if [[ $st != $expected_status ]]
+  then
+    echo "$desc: FAIL - expected exit status $expected_status, got $st"
+    rc=1
+  elif [[ $rc == 0 ]] && ! cmp -s "$expected_path" "$actual_path"
+  then
+    echo "$desc: FAIL - byte output does not match '$baseline_path'"
+    echo "expected:"
+    od -An -tx1c "$expected_path"
+    echo "actual:"
+    od -An -tx1c "$actual_path"
+    rc=1
+  fi
+
+  rm -f "$actual_path" "$expected_path"
+
+  if [[ $rc == 0 ]]
+  then
+    echo "$desc": OK
+  else
+    FAIL_CNT=$((FAIL_CNT+1))
+  fi
+
+  return $rc
+}
+
 cd $INPUT_DIR || { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
 
 # Unless otherwise noted, all files must be under Github control
@@ -55,6 +115,22 @@ run_test - "Usage - end with egrep flag (error)" 1 -i
 run_test - "Usage - unknown flag (error)" 1 "+@" 
 run_test - "Usage - end with gper option terminator (error)" 1 ++
 run_test u01 "Usage - ++ permits pattern beginning with +" 0 +s ++ -F +leading
+run_test h01 "Usage - show help" 0 +h
+
+## Configuration
+
+echo 'echo CONFIG-SOURCED; matcher=false' > "$TEST_HOME/.gper"
+run_test - "Config - load configuration by default" 1 hello
+run_test b02 "Config - +C skips configuration" 0 +C hello
+run_test - "Config - +c restores configuration loading" 1 +C +c hello
+run_test h01 "Config - help does not load configuration" 0 +h
+rm -f "$TEST_HOME/.gper"
+
+## Output format
+
+run_null_test b03 "Flag - NUL-delimited filenames" 0 filenames +z cases
+run_null_test s03 "Flag - NUL-delimited filename with matches and spaces" 0 matches +s +z spacey
+run_test b03 "Flag - +Z restores human-readable output" 0 +z +Z cases
 
 ## Filter tests
 
