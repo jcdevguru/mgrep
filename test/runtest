@@ -1,8 +1,13 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 FAIL_CNT=0
-INPUT_DIR=input
-BASELINE_DIR=baseline
+TEST_DIR=$(
+  cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null || exit 1
+  pwd -P
+) || exit 1
+GPER="$TEST_DIR/../gper"
+INPUT_DIR="$TEST_DIR/input"
+BASELINE_DIR="$TEST_DIR/baseline"
 TEST_HOME=$(mktemp -d "${TMPDIR:-/tmp}/gper-test-home.XXXXXX") || exit 1
 trap 'rm -rf -- "$TEST_HOME"' EXIT HUP INT TERM
 
@@ -16,7 +21,7 @@ function run_test()
 	local rc=0
 	local actual=''
 	
-	actual="$(HOME="$TEST_HOME" ../../gper "$@" 2>/dev/null)"
+	actual="$(HOME="$TEST_HOME" "$GPER" "$@" 2>/dev/null)"
 	local st=$?
 	if [[ $st != $expected_status ]]
 	then
@@ -25,7 +30,7 @@ function run_test()
 	elif [[ "$baseline_root" != "-" ]]
   then
     local baseline_file="${baseline_root}.txt"
-    local baseline_path="../$BASELINE_DIR/$baseline_file"
+    local baseline_path="$BASELINE_DIR/$baseline_file"
     local expected=$(cat "$baseline_path")
     if [[ "$actual" != "$expected" ]]
     then
@@ -53,12 +58,12 @@ function run_null_test()
   local baseline_mode="$4"
   shift 4
 
-  local baseline_path="../$BASELINE_DIR/${baseline_root}.txt"
+  local baseline_path="$BASELINE_DIR/${baseline_root}.txt"
   local actual_path=$(mktemp "${TMPDIR:-/tmp}/gper-test-actual.XXXXXX")
   local expected_path=$(mktemp "${TMPDIR:-/tmp}/gper-test-expected.XXXXXX")
   local rc=0
 
-  HOME="$TEST_HOME" ../../gper "$@" > "$actual_path" 2>/dev/null
+  HOME="$TEST_HOME" "$GPER" "$@" > "$actual_path" 2>/dev/null
   local st=$?
 
   case "$baseline_mode" in
@@ -103,7 +108,8 @@ function run_null_test()
   return $rc
 }
 
-cd $INPUT_DIR || { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
+cd "$INPUT_DIR" >/dev/null ||
+  { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
 
 # Unless otherwise noted, all files must be under Github control
 # since default for gper is to use Github to list files
@@ -126,6 +132,10 @@ run_test - "Config - +c restores configuration loading" 1 +C +c hello
 run_test h01 "Config - help does not load configuration" 0 +h
 rm -f "$TEST_HOME/.gper"
 
+echo 'exclude_hello() { xf+=("01.txt"); }' > "$TEST_HOME/.gper"
+run_test - "Config - Bash init function updates an array" 1 +i=exclude_hello hello
+rm -f "$TEST_HOME/.gper"
+
 ## Output format
 
 run_null_test b03 "Flag - NUL-delimited filenames" 0 filenames +z cases
@@ -137,29 +147,36 @@ run_test b03 "Flag - +Z restores human-readable output" 0 +z +Z cases
 # Filter by file names
 run_test f01 "Flag - only .txt files" 0 +of='*.txt' string
 run_test f02 "Flag - no .txt files" 0 +xf='*.txt' string
+run_test b02 "Flag - only file overrides identical exclusion" 0 +xf=01.txt +of=01.txt hello
+run_test r01 "Flag - raw file filter preserves spaces" 0 +G +iof='a b c.txt' spacey
 
 # Filter by directory names
 run_test d01 "Flag - only 'subdir' directory" 0 +od='subdir' string
 run_test d02 "Flag - exclude 'subdir' directory" 0 +xd='subdir' string
+run_test d01 "Flag - only directory overrides identical exclusion" 0 +xd=subdir +od=subdir string
+run_test r02 "Flag - raw directory filter" 0 +G +od=subdir content
 
 # Filter by Github files
 ngpfx="nongit"
 pid=$$
 (
-  # Using subshell to manage file
-  clean='rm -f ${ngpfx}*; exit 0'
-  ( eval $clean ) 2>/dev/null
-
+  FAIL_CNT=0
   ngfile="${ngpfx}-${pid}.txt"
   srch="remove me: ${pid}"
 
-  trap "$clean" 1 2 3 15
-  echo "$srch" > $ngfile
+  rm -f -- "$ngfile"
+  trap 'rm -f -- "$ngfile"; exit 1' HUP INT QUIT TERM
+  echo "$srch" > "$ngfile"
 
   run_test - "Flag - use Github to list files (no match)" 1 +g "$srch"
   run_test - "Flag - do not use Github to list files (match)" 0 +G "$srch"
-  eval $clean
+  rm -f -- "$ngfile"
+  exit $((FAIL_CNT > 0))
 )
+if [[ $? -ne 0 ]]
+then
+  FAIL_CNT=$((FAIL_CNT+1))
+fi
 
 # Basic
 run_test b01 "Basic - 1 string, no matches (1 exit status)" 1 NOTHING
@@ -179,3 +196,4 @@ run_test s04 "Simple - 1 string, +1 file, show matches (case insensitive)" 0 +s 
 run_test m01 "Moderate - 2 strings, +1 file, show matches (case sensitive)" 0 +s "case" string
 
 echo "Tests complete. Error count = $FAIL_CNT"
+exit $((FAIL_CNT > 0))

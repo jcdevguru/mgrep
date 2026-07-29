@@ -1,7 +1,7 @@
 # [gper](https://github.com/jcdevguru/gper/tree/main/gper)
 
-- Type: CLI (zsh script)
-- Environment: MacOS (or any UNIX/Linux system with zsh)
+- Type: CLI (Bash script)
+- Environment: macOS (or any UNIX/Linux system with Bash 3.2 or newer)
 - Provided for: search through files
 
 ## gper: search files for multiple terms in a source hierarchy
@@ -171,14 +171,14 @@ The `gper` script supports custom configurations through a `.gper` file located 
 
 Here's how it works:
 
-* The `.gper` file is a shell script (Zsh) that defines functions to set various options.
+* The `.gper` file is a Bash script that defines functions to set various options.
 * These functions can be used to ignore specific directories or files, set the GitHub usage flag, and more.
 * Users can define their own functions to group common settings (e.g., `ignore_npm`, `ignore_artifact`).
 * At the end of the file, users can call these functions to apply their preferred settings.
 
-Example usage (from file `dot-gper.example.zsh`):
+Example usage (from file `dot-gper.example.bash`):
 
-```zsh
+```bash
 
 # Sample preferences for a developer who
 # uses Github but is not interested in
@@ -285,7 +285,6 @@ xargs -0 \
 
 which means all text files under the current directory would be searched if the directory hierarchy is not managed by Git.
 
-
 ### Raw search, exclude certain directories
 
 If you don't want certain directories traversed, you can name them in command arguments to `gper`.  For example, if you do not want to traverse directories named `log`, `tmp`, or `.git` anywhere in the hierarchy, you can use this command:
@@ -365,6 +364,14 @@ xargs -0 \
   egrep \
     --files-with-matches \
     module2
+```
+
+## Tests
+
+Run the Bash test suite from any directory:
+
+```sh
+./test/runtest
 ```
 
 ## Discuss?

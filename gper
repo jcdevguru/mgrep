@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 # this utility finds text files under the current directory
 # that each contain occurrences of multiple strings
@@ -18,15 +18,14 @@
 # +z, +Z: use NUL-delimited or human-readable final output (default: human-readable)
 # ++: stop processing gper options
 
-# Filter options (may be specified multiple times, in any combination):
+# Filter options may be specified multiple times, in any combination.
 #
-# Supports multiple values in comma-separated list:
 #   +xd=pat1[,pat2,...]: ignore directories whose names match pat1 or pat2 (default: none)
 #   +od=pat1[,pat2,...]: search only in hierarchy under directory with name that matches pat1 or pat2 (default: none)
 #   +xf=pat1[,pat2,...]: ignore plain files whose names match pat1 or pat2 (default: none)
 #   +of=pat1[,pat2,...]: search plain files only with names that match pat1 or pat2 (default: none)
-
-# Variants ixd, iod, ixf, and iof process values literally, without processing comma-separate values.
+# +xd, +od, +xf, and +of accept multiple values in comma-separated lists.
+# +ixd, +iod, +ixf, and +iof accept values literally, without processing commas.
 
 
 # Defaults
@@ -51,6 +50,39 @@ null_output=0
 declare -a xf xd of od
 default_init=init_gper
 init="$default_init"
+
+function array_contains()
+{
+  local needle="$1"
+  shift
+  local item
+
+  for item in "$@"
+  do
+    if [[ "$item" == "$needle" ]]
+    then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+function split_commas()
+{
+  local value="$1"
+  local item
+  split_values=()
+
+  while [[ "$value" == *,* ]]
+  do
+    item="${value%%,*}"
+    split_values+=("$item")
+    value="${value#*,}"
+  done
+
+  split_values+=("$value")
+}
 
 function usage()
 {
@@ -112,11 +144,15 @@ fi
 
 # Process option file, if exists
 # Get functions defined now
-before_funcs=(${(k)functions})
+before_funcs=()
+while IFS= read -r func
+do
+  before_funcs+=("$func")
+done < <(compgen -A function)
 
 if (( $load_config == 1 ))
 then
-  option_files=($HOME/.gper .gper)
+  option_files=("$HOME/.gper" ".gper")
   for option_file in "${option_files[@]}"
   do
     if [[ -f "$option_file" ]]
@@ -128,8 +164,20 @@ fi
 
 # Now we see what new functions came in and make a list
 # of ones that are OK for init
-after_funcs=(${(k)functions})
-init_funcs=(${after_funcs:|before_funcs})
+after_funcs=()
+while IFS= read -r func
+do
+  after_funcs+=("$func")
+done < <(compgen -A function)
+
+init_funcs=()
+for func in "${after_funcs[@]}"
+do
+  if ! array_contains "$func" "${before_funcs[@]}"
+  then
+    init_funcs+=("$func")
+  fi
+done
 
 # Process init & debug flags first
 for a in "$@"
@@ -165,10 +213,10 @@ fi
 
 if [[ "$init" != "" ]]
 then
-  if (( ${init_funcs[(Ie)$init]} ))
+  if array_contains "$init" "${init_funcs[@]}"
   then
     dlog options "initializing with function '$init'"
-    eval "$init"
+    "$init"
   else
     dlog options "initialization function '$init' does not exist - skipping"
     if [[ $init != $default_init ]]
@@ -194,14 +242,14 @@ do
     +m=*)  matcher="${1#+m=}" ;;
     +z)    null_output=1 ;;
     +Z)    null_output=0 ;;
-    +xf=*) v="${1#+xf=}"; a=(${(ps.,.)v}); xf+=(${a[@]}) ;;
-    +xd=*) v="${1#+xd=}"; a=(${(ps.,.)v}); xd+=(${a[@]}) ;;
-    +of=*) v="${1#+of=}"; a=(${(ps.,.)v}); of+=(${a[@]}) ;;
-    +od=*) v="${1#+od=}"; a=(${(ps.,.)v}); od+=(${a[@]}) ;;
-    +ixf=*) xf+="${1#+ixf=}" ;;
-    +ixd=*) xd+="${1#+ixd=}" ;;
-    +iof=*) of+="${1#+iof=}" ;;
-    +iod=*) od+="${1#+iod=}" ;;
+    +xf=*) split_commas "${1#+xf=}"; xf+=("${split_values[@]}") ;;
+    +xd=*) split_commas "${1#+xd=}"; xd+=("${split_values[@]}") ;;
+    +of=*) split_commas "${1#+of=}"; of+=("${split_values[@]}") ;;
+    +od=*) split_commas "${1#+od=}"; od+=("${split_values[@]}") ;;
+    +ixf=*) xf+=("${1#+ixf=}") ;;
+    +ixd=*) xd+=("${1#+ixd=}") ;;
+    +iof=*) of+=("${1#+iof=}") ;;
+    +iod=*) od+=("${1#+iod=}") ;;
     +[dDnN]|+i=*) ;;
     *) echo >&2 "$0: unknown flag '$1'"; exit 1;;
   esac
@@ -215,7 +263,7 @@ then
   exit 1
 fi
 
-if [[ "${@[$#]}" == -* ]]
+if [[ "${!#}" == -* ]]
 then
   echo >&2 "$0: last argument must be a pattern, not a flag"
   exit 1
@@ -224,8 +272,25 @@ fi
 # Now remove all elements from "xd" & "xf" (exclude dirs, files)
 # that appear in "od", "of" (only dirs, only files)
 
-xd=("${(@)xd:#${^od}}")
-xf=("${(@)xf:#${^of}}")
+filtered=()
+for item in "${xd[@]}"
+do
+  if ! array_contains "$item" "${od[@]}"
+  then
+    filtered+=("$item")
+  fi
+done
+xd=("${filtered[@]}")
+
+filtered=()
+for item in "${xf[@]}"
+do
+  if ! array_contains "$item" "${of[@]}"
+  then
+    filtered+=("$item")
+  fi
+done
+xf=("${filtered[@]}")
 
 dlog options \
   debug="$debug"\
@@ -248,6 +313,7 @@ function find_args()
   shift 3
 
   local args=""
+  local quoted
   for a in "$@"
   do
     if [[ "$a" == '' ]]
@@ -260,7 +326,8 @@ function find_args()
       args+=" -o "
     fi
 
-    args+="-"$flag" '$prefix$a$suffix'"
+    quoted=$(quote_pattern "$prefix$a$suffix")
+    args+="-$flag $quoted"
   done
   echo "$args"
 }
@@ -274,8 +341,7 @@ function find_path_args() {
 }
 
 function quote_pattern() {
-  local pat="$1"
-  echo -E "'${pat:gs/"'"/'\"'\"'}'"
+  printf '%q' "$1"
 }
 
 function quote_patterns() {
@@ -287,7 +353,7 @@ function quote_patterns() {
   done
 
   printf "%s " "${rc[@]}"
-  echo ""
+  printf "\n"
 }
 
 function extract_flags()
@@ -298,13 +364,13 @@ function extract_flags()
   local next=$start
   local sp
 
-  while [[ $next < ${#v[@]} ]]
+  while (( next < ${#v[@]} ))
   do
-    if [[ "${v[@]:$next:1}" != -* ]]
+    if [[ "${v[$next]}" != -* ]]
     then
       break
     fi
-    printf "%s%s" "$sp" "${v[@]:$next:1}"
+    printf "%s%s" "$sp" "${v[$next]}"
     next=$((next + 1))
     sp=" "
   done
@@ -322,10 +388,10 @@ filter_paths() {
     local match=0
     case "$mode" in
       of|xf)
-        filename=${filepath:t}
+        filename=${filepath##*/}
         for pattern in "${patterns[@]}"
         do
-          if [[ "$filename" == ${~pattern} ]]
+          if [[ "$filename" == $pattern ]]
           then
             match=1
             break
@@ -335,7 +401,7 @@ filter_paths() {
       od|xd)
         for pattern in "${patterns[@]}"
         do
-          if [[ "$filepath" == */${~pattern}/* || "$filepath" == ${~pattern}/* ]]
+          if [[ "$filepath" == */$pattern/* || "$filepath" == $pattern/* ]]
           then
             match=1
             break
@@ -361,8 +427,9 @@ function gen_match()
   shift 5
   local opts="$@"
   local zero_opt=""
+  local first_opt=""
+  local file_opt=""
 
-  first_opt=""
   if (( $first == 1 ))
   then
     first_opt="--binary-files=without-match"
@@ -384,13 +451,8 @@ function gen_match()
     fi
   fi
 
-  echo -E \
-    xargs -0 "$matcher" \
-      $first_opt \
-      $zero_opt \
-      $file_opt \
-      $opts \
-      "$(quote_pattern "$pat")"
+  printf '%s\n' \
+    "xargs -0 $matcher $first_opt $zero_opt $file_opt $opts $(quote_pattern "$pat")"
   return 0
 }
 
@@ -432,21 +494,21 @@ then
   command="git ls-files -z ."
   
   # Apply directory exclusions
-  if [[ "${xd[@]}" != "" ]]; then
+  if (( ${#xd[@]} > 0 )); then
     command+=" | filter_paths xd $(quote_patterns "${xd[@]}")"
   fi
   
   # Apply directory exclusives
-  if [[ "${od[@]}" != "" ]]; then
+  if (( ${#od[@]} > 0 )); then
     command+=" | filter_paths od $(quote_patterns "${od[@]}")"
   fi
   
   # Apply file filtering
-  if [[ "${of[@]}" != "" ]]; then
+  if (( ${#of[@]} > 0 )); then
     command+=" | filter_paths of $(quote_patterns "${of[@]}")"
   fi
 
-  if [[ "${xf[@]}" != "" ]]; then
+  if (( ${#xf[@]} > 0 )); then
     command+=" | filter_paths xf $(quote_patterns "${xf[@]}")"
   fi
   
@@ -486,16 +548,16 @@ fi
 
 # Now construct command line by iterating per pattern
 arg_idx=0
-args=($@)
-pat="${args[@]:$arg_idx:1}"
+args=("$@")
+pat="${args[$arg_idx]}"
 arg_count=${#args[@]}
 
 while (( $arg_idx < $arg_count ))
 do
-    match_options=$(extract_flags $arg_idx ${args[@]})
+    match_options=$(extract_flags "$arg_idx" "${args[@]}")
     arg_idx=$?
 
-    pat="${args[@]:$arg_idx:1}"
+    pat="${args[$arg_idx]}"
 
     show_arg=0
     is_last=$((arg_idx == arg_count - 1))
@@ -510,7 +572,8 @@ do
       fi
     fi
 
-    command="${command} | "$(gen_match "$pat" $is_first $is_last $show_arg $null_output $match_options)
+    command="${command} | "$(gen_match \
+      "$pat" "$is_first" "$is_last" "$show_arg" "$null_output" "$match_options")
     arg_idx=$((arg_idx + 1))
 done
 
@@ -534,13 +597,13 @@ else
   arg_idx=0
   while (( $arg_idx < $arg_count ))
   do
-    match_options=$(extract_flags $arg_idx ${args[@]})
+    match_options=$(extract_flags "$arg_idx" "${args[@]}")
     arg_idx=$?
 
-    pat="${args[@]:$arg_idx:1}"
+    pat="${args[$arg_idx]}"
 
 
-    cmd="$(gen_match "$pat" 0 1 1 $null_output $match_options) < $match_data_file"
+    cmd="$(gen_match "$pat" 0 1 1 "$null_output" "$match_options") < $match_data_file"
     dlog execute command = "[$cmd]"
     if (( $dry_run == 0 ))
     then
