@@ -10,7 +10,7 @@
 
 # +d, +D: turn on and off debug messages (default: off)
 # +s, +S: show or do not show matching strings (default: off)
-# +g, +G: use github ls-files for starting paths if available (default: on)
+# +g, +G: use git ls-files for starting paths if available (default: on)
 # +h: show help and exit
 # +n, +N: dry run or do not dry run (default: off)
 # +i=cmd: initialize options with cmd (default: none)
@@ -36,8 +36,8 @@ matcher=egrep
 # Do not show matched results, just files
 show=0
 
-# Support only Github-recognized files (if applicable)
-github=1
+# Support only Git-tracked files (if applicable)
+git_only=1
 
 # Do not debug or dry-run
 debug=0
@@ -234,8 +234,8 @@ do
     ++)    shift; break ;;
     +s)    show=1 ;;
     +S)    show=0 ;;
-    +g)    github=1 ;;
-    +G)    github=0 ;;
+    +g)    git_only=1 ;;
+    +G)    git_only=0 ;;
     +c)    load_config=1 ;;
     +C)    load_config=0 ;;
     +h)    ;;
@@ -295,7 +295,7 @@ xf=("${filtered[@]}")
 dlog options \
   debug="$debug"\
   dry_run="$dry_run"\
-  github="$github"\
+  git_only="$git_only"\
   load_config="$load_config"\
   null_output="$null_output"\
   show="$show"\
@@ -457,7 +457,7 @@ function gen_match()
 }
 
 # Take action based on whether we are in a directory managed by git
-if [[ $github == 1 ]]
+if [[ $git_only == 1 ]]
 then
   if command -v git >/dev/null 2>&1
   then
@@ -467,19 +467,19 @@ then
       if [[ $? == 0 ]]
       then
         # No files would be matched since the current directory is ignored so
-        # we have to turn off Github
+        # we have to turn off Git-only file selection
         dlog process "not using git to list files (current directory ignored by git)"
-        github=0
+        git_only=0
       else
         dlog process "using git to list files (directory in git)"
       fi
     else
       dlog process "not using git to list files (directory not in git project)"
-      github=0
+      git_only=0
     fi
   else
     dlog process "not using git to list files (git not in command environment)"
-    github=0
+    git_only=0
   fi
 fi
 
@@ -489,7 +489,7 @@ fi
 # od: +od=src
 #     find . \( -path '*/src/*' -type f -print
 
-if [[ $github == 1 ]]
+if [[ $git_only == 1 ]]
 then
   command="git ls-files -z ."
   

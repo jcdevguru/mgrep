@@ -16,7 +16,7 @@ ignore_version_managers() {
   xf+=('.nvm*' '.asdf*' .tool-versions)
 }
  
-ignore_github_dir() {
+ignore_git_dir() {
   xd+=(.git)
 }
  
@@ -78,7 +78,7 @@ ignore_dev_artifact() {
 }
  
 ignore_dev_config() {
-  ignore_github_dir
+  ignore_git_dir
   ignore_tool_dirs
   ignore_version_managers
 }
@@ -89,7 +89,7 @@ ignore_user_environment() {
 }
  
 source_code() {
-  # Will follow Github if so configured
+  # Will use Git-tracked files if so configured
   ignore_dev_artifact
   ignore_dev_config
   ignore_newrelic
@@ -98,7 +98,7 @@ source_code() {
  
 code() {
   # All source code - even node_modules
-  github=0
+  git_only=0
   source_code
 }
  

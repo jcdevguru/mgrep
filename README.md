@@ -115,7 +115,7 @@ xargs -0 \
     iterate
 ```
 
-In the search for `foreEach`, the commands `git ls-files`, `xargs`, and `egrep` will cause all non-binary files tracked by Github to be searched and file names to be processed with NULL delimitation.  That allows us to ignore the uninteresting files as well as preserve the space correctly when sending it to the next command, in this form:
+In the search for `foreEach`, the commands `git ls-files`, `xargs`, and `egrep` will cause all non-binary files tracked by Git to be searched and file names to be processed with NULL delimitation.  That allows us to ignore the uninteresting files as well as preserve the space correctly when sending it to the next command, in this form:
 
 ```
 src/array-utils.js\0app/search.js\0test/test all.js
@@ -141,7 +141,7 @@ The second command, which begins with `xargs -0`, will supply these files to `eg
 |--------|-------------|---------|
 | `+d`, `+D` | Turn on (`+d`) or off (`+D`) debug messages | Off |
 | `+s`, `+S` | Show (`+s`) or do not show (`+S`) matching strings | Off |
-| `+g`, `+G` | Use `github ls-files` (`+g`), or bypass Github (`+G`), for files to search if in Github directory | On |
+| `+g`, `+G` | Use `git ls-files` (`+g`), or bypass Git (`+G`), when searching inside a Git work tree | On |
 | `+h` | Show command help and exit without loading configuration files | |
 | `+i=`*cmd* | Initialize options with command *cmd* | None |
 | `+n`, `+N` | Dry run: apply (`+n`) or do not apply (`+N`) debugging and do not execute search | Off |
@@ -161,7 +161,7 @@ The options that select or ignore files and directories (`xd`, `od`, `xf`, `of`,
 * Shell-style wildcards that are usable by `find` in its `name` or `path` arguments may also be used
 * Strings with any characters can be used as arguments, including whitespace
 * You can use the variants `ixd`, `iod`, `ixf`, or `iof` if the arguments contain commas
-* Will combine with filtering provided by Github when `+g` is used
+* Will combine with filtering provided by Git when `+g` is used
 
 ## Configuring gper options with .gper
 
@@ -172,7 +172,7 @@ The `gper` script supports custom configurations through a `.gper` file located 
 Here's how it works:
 
 * The `.gper` file is a Bash script that defines functions to set various options.
-* These functions can be used to ignore specific directories or files, set the GitHub usage flag, and more.
+* These functions can be used to ignore specific directories or files, set the `git_only` behavior, and more.
 * Users can define their own functions to group common settings (e.g., `ignore_npm`, `ignore_artifact`).
 * At the end of the file, users can call these functions to apply their preferred settings.
 
@@ -180,14 +180,17 @@ Example usage (from file `dot-gper.example.bash`):
 
 ```bash
 
-# Sample preferences for a developer who
-# uses Github but is not interested in
-# lock files from package managers, and
-# where minified files are tracked in Github
+# Search all source code, including files not tracked by Git.
+code() {
+  git_only=0
+  source_code
+}
 
-dev_github
-ignore_minified
-ignore_package_manager_artifact
+# Search project code while ignoring `node_modules`.
+project_code() {
+  ignore_node_modules
+  source_code
+}
 ```
 
 By grouping together favorite combinations of flags and qualifiers, it is easy to adapt `gper` for different projects or environments. Users can quickly switch between different configurations by commenting/uncommenting function calls at the end of the file.
@@ -204,10 +207,11 @@ With the `.gper` file, your runtime preferencs will be applied in the following 
 To see what options would be in effect in any particlar run, you can apply the `+n` flag to just do a dry run.  The options will show with an `options` tag on standard error output.  This command will show you debugging output and errors only, without execting the search.
 
 ```sh
-$ gper +n anystring
-DEBUG [options]: debug=1 dry_run=1 github=1 show=0 xf=() of=() xd=() od=() init=''
+$ gper +C +n anystring
+DEBUG [options]: initialization function 'init_gper' does not exist - skipping
+DEBUG [options]: debug=1 dry_run=1 git_only=1 load_config=0 null_output=0 show=0 xf=() of=() xd=() od=() init='init_gper'
 DEBUG [process]: using git to list files (directory in git)
-DEBUG [execute]: command = [git ls-files -z . | xargs -0 egrep --binary-files=without-match --files-with-matches 'anystring']
+DEBUG [execute]: command = [git ls-files -z . | xargs -0 egrep --binary-files=without-match  --files-with-matches  anystring]
 ```
 
 ## Flexibility
