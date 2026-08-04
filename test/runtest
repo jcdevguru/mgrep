@@ -6,6 +6,7 @@ TEST_DIR=$(
   pwd -P
 ) || exit 1
 GPER="$TEST_DIR/../gper"
+EXAMPLE_CONFIG="$TEST_DIR/../dot-gper.example.bash"
 INPUT_DIR="$TEST_DIR/input"
 BASELINE_DIR="$TEST_DIR/baseline"
 TEST_HOME=$(mktemp -d "${TMPDIR:-/tmp}/gper-test-home.XXXXXX") || exit 1
@@ -111,8 +112,8 @@ function run_null_test()
 cd "$INPUT_DIR" >/dev/null ||
   { echo >&2 "missing directory '$INPUT_DIR' - exiting"; exit 1; }
 
-# Unless otherwise noted, all files must be under Github control
-# since default for gper is to use Github to list files
+# Unless otherwise noted, all files must be tracked by Git
+# since gper uses Git to list files by default
 
 ## Usage errors
 run_test - "Usage - no arguments (error)" 1
@@ -136,6 +137,24 @@ echo 'exclude_hello() { xf+=("01.txt"); }' > "$TEST_HOME/.gper"
 run_test - "Config - Bash init function updates an array" 1 +i=exclude_hello hello
 rm -f "$TEST_HOME/.gper"
 
+if (
+  source "$EXAMPLE_CONFIG"
+  xd=()
+  ignore_node_modules
+  [[ ${#xd[@]} -eq 1 && "${xd[0]}" == node_modules ]] || exit 1
+
+  xd=()
+  git_only=1
+  code
+  [[ $git_only -eq 0 ]]
+)
+then
+  echo "Config - example uses node_modules and git_only: OK"
+else
+  echo "Config - example uses node_modules and git_only: FAIL"
+  FAIL_CNT=$((FAIL_CNT+1))
+fi
+
 ## Output format
 
 run_null_test b03 "Flag - NUL-delimited filenames" 0 filenames +z cases
@@ -156,7 +175,7 @@ run_test d02 "Flag - exclude 'subdir' directory" 0 +xd='subdir' string
 run_test d01 "Flag - only directory overrides identical exclusion" 0 +xd=subdir +od=subdir string
 run_test r02 "Flag - raw directory filter" 0 +G +od=subdir content
 
-# Filter by Github files
+# Filter by Git-tracked files
 ngpfx="nongit"
 pid=$$
 (
@@ -168,8 +187,13 @@ pid=$$
   trap 'rm -f -- "$ngfile"; exit 1' HUP INT QUIT TERM
   echo "$srch" > "$ngfile"
 
-  run_test - "Flag - use Github to list files (no match)" 1 +g "$srch"
-  run_test - "Flag - do not use Github to list files (match)" 0 +G "$srch"
+  run_test - "Flag - use Git to list files (no match)" 1 +g "$srch"
+  run_test - "Flag - do not use Git to list files (match)" 0 +G "$srch"
+
+  echo 'init_gper() { git_only=0; }' > "$TEST_HOME/.gper"
+  run_test - "Config - git_only=0 searches untracked files" 0 "$srch"
+  rm -f "$TEST_HOME/.gper"
+
   rm -f -- "$ngfile"
   exit $((FAIL_CNT > 0))
 )
