@@ -31,7 +31,7 @@ ignore_npm_artifact() {
 }
  
 ignore_node_modules() {
-  xd+=(.node_modules)
+  xd+=(node_modules)
 }
  
 ignore_pnpm_artifact() {
