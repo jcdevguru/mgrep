@@ -376,4 +376,4 @@ Run the Bash test suite from any directory:
 
 ## Discuss?
 
-Please submit commentary in the `Issues` tab of this Github repository.
+Please submit commentary in the `Issues` tab of this GitHub repository.
